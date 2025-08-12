@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -e
+
+function showHelp() {
+    echo ""
+    echo "startup - custom shell commands for pgvector"
+    echo "usage: startup COMMAND [OPTIONS]"
+    echo ""
+    echo "Commands:"
+    echo "➖➖➖➖➖➖➖➖➖"
+    echo "⚪  h,    help                    This Help" # Check
+
+    echo ""
+    echo "➖➖➖➖➖➖➖➖➖"
+    echo "‼️Hint: add functionality to this Script"
+    echo ""
+}
+
+function main() {
+    case $1 in
+        h|help)
+            shift
+            showHelp "$@"
+            ;;
+        *)
+            echo -e "\033[31m'$1' is not a known Command.\033[0m"
+            showHelp
+            echo ""
+            ;;
+    esac
+}

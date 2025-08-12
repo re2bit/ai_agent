@@ -1,0 +1,24 @@
+services:
+  agent-server:
+    container_name: agent-server
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/agent-server/Dockerfile
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./src/agent-server/agent_server.py
+          target: /app/agent_server.py
+    volumes:
+      - ./data:/app/data
+    environment:
+      - FASTAPI_HOST=${FASTAPI_HOST-0.0.0.0}
+      - FASTAPI_PORT=${FASTAPI_PORT-8000}
+      - LLM_MODEL=${LLM_MODEL-qwen2.5}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL-http://host.docker.internal:11434}
+      - SEARX_HOST=${SEARX_HOST-http://host.docker.internal:9080}
+      - LANGFUSE_HOST=${SEARX_HOST-http://host.docker.internal:3000}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - DEBUG=56789
+    restart: unless-stopped

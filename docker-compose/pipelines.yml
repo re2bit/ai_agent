@@ -1,0 +1,7 @@
+services:
+  pipelines:
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/pipelines/Dockerfile
+    container_name: pipelines
+    restart: always

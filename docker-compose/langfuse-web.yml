@@ -1,49 +1,9 @@
 services:
-  agent-server:
-    container_name: agent-server
-    build:
-      context: .
-      dockerfile: docker/agent-server/Dockerfile
-    develop:
-      watch:
-        - action: sync+restart
-          path: ./src/agent-server/agent_server.py
-          target: /app/agent_server.py
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
-    environment:
-      - FASTAPI_HOST=${FASTAPI_HOST-0.0.0.0}
-      - FASTAPI_PORT=${FASTAPI_PORT-8000}
-      - LLM_MODEL=${LLM_MODEL-qwen2.5}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL-http://host.docker.internal:11434}
-      - SEARX_HOST=${SEARX_HOST-http://host.docker.internal:9080}
-      - LANGFUSE_HOST=${SEARX_HOST-http://host.docker.internal:3000}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
-      - DEBUG=56789
-    restart: unless-stopped
-  pipelines:
-    build:
-      context: .
-      dockerfile: docker/pipelines/Dockerfile
-    container_name: pipelines
+  langfuse-web:
+    image: langfuse/langfuse:3
+    container_name: langfuse-web
     restart: always
-  searxng:
-    image: docker.io/searxng/searxng:latest
-    container_name: searxng
-    restart: always
-    ports:
-      - "8080:8080"
-    volumes:
-      - "./config/:/etc/searxng/"
-      - "./data/:/var/cache/searxng/"
-  langfuse-worker:
-    image: langfuse/langfuse-worker:3
-    container_name: langfuse-worker
-    restart: always
-    depends_on: &langfuse-depends-on
+    depends_on:
       postgres:
         condition: service_healthy
       minio:
@@ -52,9 +12,7 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:3030:3030"
-    environment: &langfuse-worker-env
+    environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres # CHANGEME
       SALT: "mysalt" # CHANGEME
       ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000" # CHANGEME: generate via `openssl rand -hex 32`
@@ -98,15 +56,6 @@ services:
       REDIS_TLS_CA: ${REDIS_TLS_CA:-/certs/ca.crt}
       REDIS_TLS_CERT: ${REDIS_TLS_CERT:-/certs/redis.crt}
       REDIS_TLS_KEY: ${REDIS_TLS_KEY:-/certs/redis.key}
-  langfuse-web:
-    image: langfuse/langfuse:3
-    container_name: langfuse-web
-    restart: always
-    depends_on: *langfuse-depends-on
-    ports:
-      - 3000:3000
-    environment:
-      <<: *langfuse-worker-env
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: mysecret # CHANGEME
       LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-}
@@ -118,97 +67,3 @@ services:
       LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
       LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-}
       LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
-  clickhouse:
-    image: clickhouse/clickhouse-server
-    container_name: clickhouse
-    restart: always
-    user: "101:101"
-    environment:
-      CLICKHOUSE_DB: default
-      CLICKHOUSE_USER: clickhouse
-      CLICKHOUSE_PASSWORD: clickhouse # CHANGEME
-    volumes:
-      - langfuse_clickhouse_data:/var/lib/clickhouse
-      - langfuse_clickhouse_logs:/var/log/clickhouse-server
-    ports:
-      - "127.0.0.1:8123:8123"
-      - "127.0.0.1:9000:9000"
-    healthcheck:
-      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 1s
-  minio:
-    image: minio/minio
-    container_name: minio
-    restart: always
-    entrypoint: sh
-    # create the 'langfuse' bucket before starting the service
-    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
-    environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: miniosecret # CHANGEME
-    ports:
-      - "9090:9000"
-      - "127.0.0.1:9091:9001"
-    volumes:
-      - langfuse_minio_data:/data
-    healthcheck:
-      test: [ "CMD", "mc", "ready", "local" ]
-      interval: 1s
-      timeout: 5s
-      retries: 5
-      start_period: 1s
-  redis:
-    image: redis:7
-    container_name: redis
-    restart: always
-    # CHANGEME: row below to secure redis password
-    command: >
-      --requirepass ${REDIS_AUTH:-myredissecret}
-    ports:
-      - 127.0.0.1:6379:6379
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 3s
-      timeout: 10s
-      retries: 10
-  postgres:
-    container_name: postgres
-    image: postgres:${POSTGRES_VERSION:-latest}
-    restart: always
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 3s
-      timeout: 3s
-      retries: 10
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres # CHANGEME
-      POSTGRES_DB: postgres
-    ports:
-      - 127.0.0.1:5432:5432
-    volumes:
-      - langfuse_postgres_data:/var/lib/postgresql/data
-  owui:
-    image: ghcr.io/open-webui/open-webui:latest
-    container_name: open-webui
-    restart: always
-    ports:
-      - "3001:8080"
-    environment:
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL-http://host.docker.internal:11434}
-    volumes:
-      - open-webui:/app/backend/data
-volumes:
-  langfuse_postgres_data:
-    driver: local
-  langfuse_clickhouse_data:
-    driver: local
-  langfuse_clickhouse_logs:
-    driver: local
-  langfuse_minio_data:
-    driver: local
-  open-webui:
-    driver: local

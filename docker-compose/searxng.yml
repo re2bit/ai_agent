@@ -1,0 +1,8 @@
+services:
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: searxng
+    restart: always
+    volumes:
+      - "./config/:/etc/searxng/"
+      - "./data/:/var/cache/searxng/"

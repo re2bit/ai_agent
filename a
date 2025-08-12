@@ -1,0 +1,586 @@
+#!/usr/bin/env bash
+set -e
+
+function showHelp() {
+    echo ""
+    echo "a"
+    echo "usage: a COMMAND [OPTIONS]"
+    echo ""
+    echo "Commands:"
+    echo "➖➖➖➖➖➖➖➖➖"
+    echo "⚪  i,    init                    Initialize the docker compose or update the images." # Check
+    echo "⚪  b,    build                   Build a given Service"                               # Check
+    echo "⚪  bma,  build-multi-arch        Build a given Service for multiple Architectures"    # Check
+    echo "⚪  e,    exec                    Execute a command in the given container."           # Check
+    echo "⚪  s,    start-service           Starts a service or all if not specified."           # Check
+    echo "⚪  d,    stop-service            Stops a service or all if not specified."            # Check
+    echo "⚪  l,    logs                    shows the logs for the Service"                      # Check
+    echo "⚪  ti,   toggle-init             enables/disables init containers"                    # Check
+    echo "⚪  td,   toggle-debug            enables/disables debugging for go"                   # Check
+    echo "⚪  dpsw, docker-ps-watch         Watches the Services"                                # Check
+    echo "⚪  rd,   reset-database          Resets the Database."                                # Check
+    echo "⚪  rc,   restart-containers      Stops all local containers and starts new ones."     # Check
+
+    echo ""
+    echo "➖➖➖➖➖➖➖➖➖"
+    echo "‼️Hint: execute 'a COMMAND --help' for more information on how to use the command."
+    echo "‼️Hint: create empty .addBanner file to show fancy loGO"
+    echo ""
+}
+
+SED=""
+function initSed()
+{
+  echo "Check for SED">&2
+
+  if [[ $SED != "" ]]; then
+    return 0
+  fi
+
+  if [[ "$(uname)" == "Darwin" ]]; then
+    if command -v gsed >/dev/null 2>&1; then
+      SED="gsed"
+    else
+      echo "Error: GNU sed (gsed) is required. Please install with:"
+      echo "  brew install gnu-sed"
+      echo "  "
+      echo "  brew can be found at https://brew.sh"
+      echo "  Homebrew is a package manager for MacOs"
+      exit 1
+    fi
+  else
+    SED="sed"
+  fi
+}
+
+function main() {
+    checkDependencies
+
+    case $1 in
+        i|init)
+            shift
+            init "$@"
+            ;;
+        b|build)
+            shift
+            build "$@"
+            ;;
+        bma|build-multi-arch)
+            shift
+            build-multi-arch "$@"
+            ;;
+        e|exec)
+            shift
+            execCommand "$@"
+            ;;
+        s|start-service)
+            shift
+            startService "$@"
+            ;;
+        d|stop-service)
+            shift
+            stopService "$@"
+            ;;
+        l|logs)
+            shift
+            showLogs "$@"
+            ;;
+        ti|toggle-init)
+            shift
+            toggleInit "$@"
+            ;;
+        td|toggle-debug)
+            shift
+            toggleDebug "$@"
+            ;;
+        dpsw|docker-ps-watch)
+           shift
+           docker-ps-watch "$@"
+           ;;
+        at|acceptance-test)
+            shift
+            runAcceptanceTests "$@"
+            ;;
+        ut|unit-test)
+            shift
+            runUnitTests "$@"
+            ;;
+        docker-cli-plugin-metadata)
+            docker-metadata
+            ;;
+        --help|"")
+            showHelp
+            ;;
+        rc|restart-containers)
+           shift
+           restartContainers "$@"
+           ;;
+        rd|reset-database)
+            resetDatabase
+            ;;
+        sy|sync-repo)
+            shift
+            syncRepo "$@"
+            ;;
+        un|update-napi)
+            shift
+            updateNapi "$@"
+            ;;
+        *)
+            echo -e "\033[31m'$1' is not a known Command.\033[0m"
+            showHelp
+            echo ""
+            ;;
+    esac
+}
+
+#################################
+######## Helper Functions #######
+#################################
+
+function checkDependencies() {
+  set +e
+  local STATUS
+  docker info > /dev/null 2>&1
+  STATUS=$?
+
+  if [ $STATUS -ne 0 ]; then
+      echo "⚠️  Warning: Docker may not be working correctly"
+      printf "❓ Do you want to continue anyway? (y/N): "
+      read -r answer
+      if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+          echo "❌ Aborted."
+          exit 1
+      fi
+  fi
+
+  if [ -x git ]; then
+      echo "⚠️  Warning: Git may not be working correctly"
+      printf "❓ Do you want to continue anyway? (y/N): "
+      read -r answer
+      if [ "$answer" != "y" ] && [ "$answer" != "Y" ]; then
+          echo "❌ Aborted."
+          exit 1
+      fi
+  fi
+
+   if [ -a .addBanner ]; then
+    local IMAGE_NAME
+    IMAGE_NAME="a-banner"
+    local DOCKERFILE_PATH
+    DOCKERFILE_PATH="./docker/a/Dockerfile"
+
+    if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+        docker build -q -f "$DOCKERFILE_PATH" -t "$IMAGE_NAME" . >/dev/null 2>&1
+    fi
+
+    docker run --rm -t "$IMAGE_NAME" 2>/dev/null
+  fi
+
+  set -e
+}
+
+function init() {
+    local USERNAME=""
+    local PASSWORD=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --username=*)
+                USERNAME="${1#*=}"
+                shift
+                ;;
+            --password=*)
+                PASSWORD="${1#*=}"
+                shift
+                ;;
+            --help)
+                echo "usage: a init [OPTIONS]"
+                echo ""
+                echo "Options:"
+                echo "  --help               This Help"
+                echo ""
+                exit
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                echo "Run 'a init --help' for usage information"
+                exit 1
+                ;;
+        esac
+    done
+
+    if [ ! -f ./.env ]; then
+        cp ./config/.env ./.env && \
+        echo "⚪ Env file created int .env" && \
+        echo "   This File contains general Settings like Image Names and ports"
+    else
+        echo "ℹ️ ./.env already exists, skipping"
+    fi
+
+    if [ ! -f ./compose.override.yml ]; then
+        cp ./config/compose.override.yml ./compose.override.yml && \
+        echo "⚪ Compose Overwrite file created in compose.override.yml" && \
+        echo "   This File should be used to customize your Compose environment"
+    else
+        echo "ℹ️ ./compose.override.yml already exists, skipping"
+    fi
+
+    echo "" && \
+    echo -e "\033[44m\033[97m" && \
+    echo "⚠️ You did the Init of the your development Directory ⚠️" && \
+    echo -e "\033[0m" && \
+    echo "" && \
+    echo ""
+
+    return 0
+}
+
+function build() {
+  local SERVICE
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --help)
+        echo "usage: a build SERVICE"
+        echo ""
+        echo "SERVICE: SERVICE TO BUILD"
+        echo ""
+        echo "Options:"
+        echo "  --help     This Help"
+        echo ""
+        exit
+        ;;
+      *)
+        if [ -z "$SERVICE" ]; then
+          SERVICE="$1"
+        else
+          echo "Error: Too many arguments"
+          exit 1
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  if [ -z "$SERVICE" ]; then
+    echo "Error: Service Name Required"
+    exit 1
+  fi
+
+  echo " ⚙️ Start Building Service '$SERVICE'"
+
+  COMPOSE_BAKE=true docker compose build "$SERVICE"
+}
+
+function build-multi-arch() {
+      local SERVICE
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --help)
+        echo "usage: a [bma|build-multi-arch] SERVICE"
+        echo ""
+        echo "We wont allow Multi Architecture Arch Builds for non Base Images"
+        echo "Base Images are identified by the Label 'BaseImage=1' in docker compose Configuration"
+        echo ""
+        echo "SERVICE: SERVICE TO BUILD"
+        echo ""
+        echo "Options:"
+        echo "  --help     This Help"
+        echo ""
+        exit
+        ;;
+      *)
+        if [ -z "$SERVICE" ]; then
+          SERVICE="$1"
+        else
+          echo "Error: Too many arguments"
+          exit 1
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  if [ -z "$SERVICE" ]; then
+    echo "Error: Service Name Required"
+    exit 1
+  fi
+
+  echo " ⚙️ Start Building Service '$SERVICE'"
+
+  if ! IsBaseImage "$SERVICE"; then
+    echo  "❌ Service '$SERVICE' is not an Base Image"
+    exit 1
+  fi
+
+  if ! docker buildx ls --format "{{.Name}}" | grep multi_arch_builder; then
+    echo  "⚠️ Multi Arch Builder not found, creating"
+    docker buildx create --name multi_arch_builder --use --config buildkitd.toml
+    echo " ✅ Done creating Multi Arch Builder"
+  fi
+
+  if ! BUILDX_BAKE_ENTITLEMENTS_FS=0 docker buildx bake --set "*.ssh=default" "$SERVICE" --push; then
+      echo  "❌ Service '$SERVICE' is not build"
+      exit 1
+  fi
+  echo " ✅ Done Building Service '$SERVICE'"
+  exit 0
+}
+
+IsBaseImage() {
+  local image=$1
+  local query
+  query=".services[\"${image}\"].labels[\"BaseImage\"]"
+
+  echo "⚠️  Validating '$image' is Base Image"
+
+  local -a yq_cmd
+  if command -v yq &>/dev/null; then
+    yq_cmd=(yq e "${query}" -)
+  else
+    yq_cmd=(docker run --rm -i --entrypoint yq linuxserver/yq e "${query}" -)
+  fi
+
+  local hasBaseImageTag
+  hasBaseImageTag=$(docker compose --profile internal config | "${yq_cmd[@]}")
+
+  if [ -z "$hasBaseImageTag" ] || [ "$hasBaseImageTag" = "null" ]; then
+    echo "⚠️  The given Image '$image' is no Base Image, Label 'BaseImage' missing."
+    return 1
+  fi
+
+  echo "'$image' is Base Image"
+  return 0
+}
+
+function execCommand() {
+    if [[ "$1" == "--help" ]] || [[ -z "$2" ]]; then
+        echo "usage: a e SERVICE COMMAND"
+        exit 1
+    fi
+
+    local SERVICE=$1
+    shift
+    local CMD=( "$@" )
+
+    echo " ⚙️ Executing Command '${CMD[*]}' in '$SERVICE'"
+
+    docker compose exec "$SERVICE" "${CMD[@]}"
+}
+
+function startService() {
+    while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --help)
+        echo "usage: a d [SERVICE]"
+        echo ""
+        echo "Service: The name of the Service like it is defined in the docker-compose.yml"
+        echo ""
+        echo "(If no Service is specified all are stopped)"
+        echo ""
+        exit
+        ;;
+      *)
+        if [ -z "$SERVICE" ]; then
+          SERVICE="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  if [ -z "$SERVICE" ]; then
+    docker compose down
+  else
+    docker compose down "$SERVICE"
+  fi
+}
+
+function toggleInit() {
+    while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --help)
+        echo "usage: a ti"
+        echo ""
+        echo "Toggles Init Containers"
+        echo ""
+        echo "Init Containers, do things like:"
+        echo "                                go mod vendor"
+        echo "                                go mod tidy"
+        echo "                                composer install"
+        echo ""
+        echo "But this takes time."
+        echo "For local development it is not necessary to execute them every time."
+        echo "This Command disables or enables the init Containers."
+        echo ""
+        exit
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  initSed
+  echo "⚠️Toggle Init"
+  $SED -i -E '/# init dependency$/ { /^#/ s/^#//; t; s/^/#/ }' "compose.override.yml"
+}
+
+function toggleDebug() {
+    while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --help)
+        echo "usage: a td"
+        echo ""
+        echo "Toggles Debug for agent-server"
+        echo ""
+        echo "If this is enabled the agent-server Container will be started with activated pydevd_pycharm"
+        echo "⚠️Remember you have to connect with your Debugger before the Application"
+        echo "⚠️is ready to handle Requests"
+        echo ""
+        echo ""
+        exit
+        ;;
+      *)
+        shift
+        ;;
+    esac
+  done
+
+  initSed
+  echo "⚠️Toggle Debug"
+  $SED -i -E '/# debug switch$/ { /^#/ s/^#//; t; s/^/#/ }' ".env"
+  cd .. || directoryError
+  build sca
+  cd .. || directoryError
+  startService sca
+}
+
+function showLogs() {
+   while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --help)
+        echo "usage: a l [SERVICE]"
+        echo ""
+        echo "Service: The name of the Service like it is defined in the docker-compose.yml"
+        echo ""
+        echo "Automatically shows the Logs of the Init Container if any"
+        echo "(If no Service is specified all Logs are shown)"
+        echo ""
+        exit
+        ;;
+      *)
+        if [ -z "$SERVICE" ]; then
+          SERVICE="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  if ! docker compose logs init-"$SERVICE"; then
+      echo "⚠️Could not display init Container Logs, skipping"
+  fi
+  docker compose logs "$SERVICE"
+}
+
+function restartContainers() {
+    if [[ "$1" == "--help" ]]; then
+        echo "usage: a rc "
+        echo ""
+        echo "Restarts all Containers (docker compose down)"
+        echo "⚠️ This will drop every change in the Containers, the Containers will be RECREATED !"
+        exit 1
+    fi
+
+    docker compose down && docker compose up -d
+}
+
+function resetDatabase() {
+    echo " ⚙️ Destroying Database Container"
+    docker compose down db
+    echo " ⚙️ Ensure that Database is up"
+    docker compose up -d db
+}
+
+function docker-metadata() {
+  echo "{"
+  echo '    "SchemaVersion": "0.1.0",'
+  echo '    "Vendor": "rene-gerritsen.",'
+  echo '    "Version": "v0.0.1",'
+  echo '    "ShortDescription": "a - the first ai system i developed"'
+  echo '}'
+}
+
+if [ "$1" == "a" ]; then
+  shift
+fi
+
+function docker-ps-watch() {
+    echo " ⚙️ Watching Services"
+
+    local cmd_ps='docker compose ps --format "table {{.Service}}\t{{.Status}}"'
+    # shellcheck disable=SC2016
+    local awk_script='
+        NR==1 { print; next }
+        /healthy/ { print "\033[32m" $0 "\033[0m"; next }
+        /unhealthy|Exited|Restarting|Paused|Dead/ { print "\033[31m" $0 "\033[0m"; next }
+        /starting/ { print "\033[34m" $0 "\033[0m"; next }
+        { print }
+    '
+
+    initSed
+
+    local cmd_awk
+    cmd_awk=$(echo "$awk_script" | tr "\n" " " | $SED 's/  */ /g')
+
+    watch -c "$cmd_ps | awk '$cmd_awk'"
+}
+
+# TODO: Rework Enable Debug
+function enableXdebug() {
+    if [[ "$2" == "--help" || -z "$2" ]]; then
+        echo "usage: a x SERVICE"
+        echo ""
+        echo "SERVICE: The name of the service like 'agent-server'"
+        echo ""
+    else
+        SERVICE="$2"
+        if docker compose ps --services | grep -q $SERVICE; then
+            docker compose restart $SERVICE
+            echo -e "\033[42m\033[97m"
+            echo "REMEMBER:"
+            echo "------------------------------------------------------------------------"
+            echo "You need to run Commands from within the Container"
+            echo "It's not only faster, but guarantees the debug config is not overwritten"
+            echo -e "\033[44m\033[97m"
+            echo "./a x SERVICE"
+            echo -e "\033[0m"
+        else
+            echo "Error: Service '$SERVICE' does not exist or is not running."
+        fi
+    fi
+}
+
+function disableXdebug() {
+    if [[ "$2" == "--help" || -z "$2" ]]; then
+        echo "usage: service xd SERVICE"
+        echo ""
+        echo "SERVICE: The name of the service like 'agent-server'"
+        echo ""
+    else
+        SERVICE="$2"
+        if docker compose ps --services | grep -q $SERVICE; then
+            docker compose exec $SERVICE rm /usr/local/etc/php/conf.d/zz-xdebug.ini
+            docker compose restart $SERVICE
+        else
+            echo "Error: Service '$SERVICE' does not exist or is not running."
+        fi
+    fi
+}
+
+
+
+main "$@"

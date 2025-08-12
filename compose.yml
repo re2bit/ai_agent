@@ -1,0 +1,32 @@
+include:
+  - path: ./docker-compose/agent-server.yml
+    project_directory: ./
+  - path: ./docker-compose/pipelines.yml
+    project_directory: ./
+  - path: ./docker-compose/searxng.yml
+    project_directory: ./
+  - path: ./docker-compose/langfuse-worker.yml
+    project_directory: ./
+  - path: ./docker-compose/langfuse-web.yml
+    project_directory: ./
+  - path: ./docker-compose/clickhouse.yml
+    project_directory: ./
+  - path: ./docker-compose/minio.yml
+    project_directory: ./
+  - path: ./docker-compose/redis.yml
+    project_directory: ./
+  - path: ./docker-compose/postgres.yml
+    project_directory: ./
+  - path: ./docker-compose/owui.yml
+    project_directory: ./
+volumes:
+  langfuse_postgres_data:
+    driver: local
+  langfuse_clickhouse_data:
+    driver: local
+  langfuse_clickhouse_logs:
+    driver: local
+  langfuse_minio_data:
+    driver: local
+  open-webui:
+    driver: local
