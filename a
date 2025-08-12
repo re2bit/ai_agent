@@ -499,10 +499,25 @@ function restartContainers() {
 }
 
 function resetDatabase() {
-    echo " ⚙️ Destroying Database Container"
-    docker compose down db
-    echo " ⚙️ Ensure that Database is up"
-    docker compose up -d db
+    echo " ⚙️ Finding services with resetableDb label"
+    local resetable_services
+    resetable_services=$(docker compose config --format json | jq -r '.services | to_entries[] | select(.value.labels.resetableDb != null) | .key')
+    
+    if [ -z "$resetable_services" ]; then
+        echo " ⚠️ No services with resetableDb label found"
+        return 1
+    fi
+    
+    echo " ℹ️ Found services with resetableDb label: $resetable_services"
+    
+    for service in $resetable_services; do
+        echo " ⚙️ Restarting service: $service"
+        echo " ⚙️ Stopping $service"
+        docker compose down "$service"
+        echo " ⚙️ Starting $service"
+        docker compose up -d "$service"
+        echo " ✅ Service $service restarted"
+    done
 }
 
 function docker-metadata() {

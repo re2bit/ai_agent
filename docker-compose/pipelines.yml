@@ -1,7 +1,11 @@
 services:
   pipelines:
+    image: ${BASE_IMAGE-xaer.de/}${PIPELINES_IMAGE-pipelines}:${PIPELINES_VERSION-latest}
     build:
       context: ${INCLUDED_COMPOSED_CONTEXT-./}
       dockerfile: docker/pipelines/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_PIPELINES_IMAGE-ghcr.io/open-webui/pipelines}
+        PIPELINES_VERSION: ${PIPELINES_BASE_VERSION-main}
     container_name: pipelines
     restart: always

@@ -1,9 +1,13 @@
 services:
   agent-server:
     container_name: agent-server
+    image: ${BASE_IMAGE-xaer.de/}${AGENT_SERVER_IMAGE-agent-server}:${AGENT_SERVER_VERSION-latest}
     build:
       context: ${INCLUDED_COMPOSED_CONTEXT-./}
       dockerfile: docker/agent-server/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_AGENT_SERVER_IMAGE-python}
+        PYTHON_VERSION: ${PYTHON_VERSION-3.10-slim}
     develop:
       watch:
         - action: sync+restart

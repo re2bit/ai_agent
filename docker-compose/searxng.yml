@@ -1,6 +1,12 @@
 services:
   searxng:
-    image: docker.io/searxng/searxng:latest
+    image: ${BASE_IMAGE-xaer.de/}${SEARXNG_IMAGE-searxng}:${SEARXNG_VERSION-latest}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/searxng/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_SEARXNG_IMAGE-docker.io/searxng/searxng}
+        SEARXNG_VERSION: ${SEARXNG_VERSION-latest}
     container_name: searxng
     restart: always
     volumes:

@@ -1,6 +1,12 @@
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server
+    image: ${BASE_IMAGE-xaer.de/}${CLICKHOUSE_IMAGE-clickhouse}:${CLICKHOUSE_VERSION-latest}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/clickhouse/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_CLICKHOUSE_IMAGE-clickhouse/clickhouse-server}
+        CLICKHOUSE_VERSION: ${CLICKHOUSE_VERSION-latest}
     container_name: clickhouse
     restart: always
     user: "101:101"

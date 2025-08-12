@@ -1,6 +1,12 @@
 services:
   redis:
-    image: redis:7
+    image: ${BASE_IMAGE-xaer.de/}${REDIS_IMAGE-redis}:${REDIS_VERSION-7}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/redis/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_REDIS_IMAGE-redis}
+        REDIS_VERSION: ${REDIS_VERSION-7}
     container_name: redis
     restart: always
     # CHANGEME: row below to secure redis password

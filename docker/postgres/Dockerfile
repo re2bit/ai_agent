@@ -1,4 +1,6 @@
-FROM docker pull pgvector/pgvector:pg17-bookworm
+ARG BASE_IMAGE=postgres
+ARG POSTGRES_VERSION=latest
+FROM ${BASE_IMAGE}:${POSTGRES_VERSION}
 
-RUN mkdir -p /docker-entrypoint-initdb.d
-
+# This Dockerfile extends the base postgres image
+# Add any customizations here if needed

@@ -1,6 +1,12 @@
 services:
   minio:
-    image: minio/minio
+    image: ${BASE_IMAGE-xaer.de/}${MINIO_IMAGE-minio}:${MINIO_VERSION-latest}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/minio/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_MINIO_IMAGE-minio/minio}
+        MINIO_VERSION: ${MINIO_VERSION-latest}
     container_name: minio
     restart: always
     entrypoint: sh

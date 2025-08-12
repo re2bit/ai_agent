@@ -1,6 +1,12 @@
 services:
   langfuse-worker:
-    image: langfuse/langfuse-worker:3
+    image: ${BASE_IMAGE-xaer.de/}${LANGFUSE_WORKER_IMAGE-langfuse-worker}:${LANGFUSE_WORKER_VERSION-3}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/langfuse-worker/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_LANGFUSE_WORKER_IMAGE-langfuse/langfuse-worker}
+        LANGFUSE_WORKER_VERSION: ${LANGFUSE_WORKER_VERSION-3}
     container_name: langfuse-worker
     restart: always
     depends_on: &langfuse-depends-on

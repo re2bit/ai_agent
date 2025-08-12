@@ -28,3 +28,6 @@ services:
   owui:
     ports:
       - "3001:8080"
+#  pgvector:
+#    volumes:
+#      - pgvector_data:/var/lib/postgresql/data

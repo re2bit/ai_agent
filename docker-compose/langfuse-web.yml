@@ -1,6 +1,12 @@
 services:
   langfuse-web:
-    image: langfuse/langfuse:3
+    image: ${BASE_IMAGE-xaer.de/}${LANGFUSE_WEB_IMAGE-langfuse}:${LANGFUSE_WEB_VERSION-3}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/langfuse-web/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_LANGFUSE_WEB_IMAGE-langfuse/langfuse}
+        LANGFUSE_WEB_VERSION: ${LANGFUSE_WEB_VERSION-3}
     container_name: langfuse-web
     restart: always
     depends_on:

@@ -19,6 +19,8 @@ include:
     project_directory: ./
   - path: ./docker-compose/owui.yml
     project_directory: ./
+  - path: ./docker-compose/pgvector.yml
+    project_directory: ./
 volumes:
   langfuse_postgres_data:
     driver: local
@@ -29,4 +31,6 @@ volumes:
   langfuse_minio_data:
     driver: local
   open-webui:
+    driver: local
+  pgvector_data:
     driver: local

@@ -1,6 +1,12 @@
 services:
   owui:
-    image: ghcr.io/open-webui/open-webui:latest
+    image: ${BASE_IMAGE-xaer.de/}${OWUI_IMAGE-open-webui}:${OWUI_VERSION-latest}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/owui/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_OWUI_IMAGE-ghcr.io/open-webui/open-webui}
+        OWUI_VERSION: ${OWUI_VERSION-latest}
     container_name: open-webui
     restart: always
     environment:

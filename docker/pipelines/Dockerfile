@@ -1,4 +1,6 @@
-FROM ghcr.io/open-webui/pipelines:main
+ARG BASE_IMAGE=ghcr.io/open-webui/pipelines
+ARG PIPELINES_VERSION=main
+FROM ${BASE_IMAGE}:${PIPELINES_VERSION}
 
 RUN mkdir -p /app/pipelines
 

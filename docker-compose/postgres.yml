@@ -1,7 +1,13 @@
 services:
   postgres:
     container_name: postgres
-    image: postgres:${POSTGRES_VERSION:-latest}
+    image: ${BASE_IMAGE-xaer.de/}${POSTGRES_IMAGE-postgres}:${POSTGRES_VERSION:-latest}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/postgres/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_POSTGRES_IMAGE-postgres}
+        POSTGRES_VERSION: ${POSTGRES_VERSION:-latest}
     restart: always
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres" ]
