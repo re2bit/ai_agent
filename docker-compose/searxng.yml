@@ -10,5 +10,5 @@ services:
     container_name: searxng
     restart: always
     volumes:
-      - "./config/:/etc/searxng/"
-      - "./data/:/var/cache/searxng/"
+      - ./config/searxng/:/etc/searxng/
+      - searxng_data:/var/cache/searxng/
