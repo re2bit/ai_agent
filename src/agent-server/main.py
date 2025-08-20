@@ -34,8 +34,7 @@ app = FastAPI(
     title="Agent API Server",
     description="FastAPI server for the SQL and search agent",
 )
-#app.include_router(rag.Routes()())
-#app.include_router(chat.Routes()())
+
 
 
 @app.get("/")
@@ -46,6 +45,8 @@ async def root():
 
 
 def main() -> None:
+    # app.include_router(rag.Routes()())
+    # app.include_router(chat.Routes()())
     app.include_router(test.Routes()())
     fastapi_port = container.config.fastapi.port()
     fastapi_host = container.config.fastapi.host()
