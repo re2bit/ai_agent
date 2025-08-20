@@ -56,20 +56,20 @@ def search_node(state: InternetArchiveState) -> InternetArchiveState:
     """
     Search node for the Internet Archive search graph.
     Uses the InternetArchiveSearchWrapper to search for items.
-    
+
     Args:
         state: The current state with the query
-        
+
     Returns:
         Updated state with search results
     """
     try:
         search = InternetArchiveSearchWrapper(k=100, params={})
         result = search.search(state["query"])
-        
+
         # Parse the JSON string result
         result_dict = json.loads(str(result))
-        
+
         # Update the state
         return {
             **state,
@@ -88,10 +88,10 @@ def filter_node(state: InternetArchiveState) -> InternetArchiveState:
     """
     Filter node for the Internet Archive search graph.
     Uses the LLM to filter results based on relevance to the query.
-    
+
     Args:
         state: The current state with search results
-        
+
     Returns:
         Updated state with filtered results
     """
@@ -101,7 +101,7 @@ def filter_node(state: InternetArchiveState) -> InternetArchiveState:
             "filtered_results": [],
             "error": state.get("error") or "No results to filter"
         }
-    
+
     try:
         # Create a prompt for the LLM to filter the results
         filter_prompt = PromptTemplate.from_template(
@@ -118,22 +118,22 @@ def filter_node(state: InternetArchiveState) -> InternetArchiveState:
             Example format: ["item1", "item2", "item3"]
             """
         )
-        
+
         # Format the prompt with the query and results
         formatted_prompt = filter_prompt.format(
             query=state["query"],
             results=json.dumps(state["results"])
         )
-        
+
         # Get the filtered results from the LLM
         llm_response = llm.invoke(formatted_prompt)
-        
+
         # Try to parse the response as JSON
         try:
             filtered_results = json.loads(llm_response.content)
             if not isinstance(filtered_results, list):
                 filtered_results = []
-                
+
             return {
                 **state,
                 "filtered_results": filtered_results
@@ -157,10 +157,10 @@ def metadata_node(state: InternetArchiveState) -> InternetArchiveState:
     """
     Metadata node for the Internet Archive search graph.
     Retrieves detailed metadata for filtered results.
-    
+
     Args:
         state: The current state with filtered results
-        
+
     Returns:
         Updated state with metadata for filtered results
     """
@@ -170,11 +170,11 @@ def metadata_node(state: InternetArchiveState) -> InternetArchiveState:
             "metadata": {},
             "error": state.get("error") or "No filtered results to get metadata for"
         }
-    
+
     try:
         # Initialize the search wrapper
         search = InternetArchiveSearchWrapper(k=100, params={})
-        
+
         # Get metadata for each filtered result
         metadata = {}
         for item_id in state["filtered_results"]:
@@ -184,7 +184,7 @@ def metadata_node(state: InternetArchiveState) -> InternetArchiveState:
             except Exception as e:
                 # If metadata retrieval fails for an item, add error message
                 metadata[item_id] = {"error": f"Failed to get metadata: {str(e)}"}
-        
+
         # Update the state with metadata
         return {
             **state,
@@ -293,7 +293,7 @@ class InternetArchiveSearchWrapper(BaseModel):
         """Actual request to searx API."""
         item = internetarchive.get_item(params["q"])
         files = internetarchive.get_files(params["q"])
-        
+
         res = dict()
         res['metadata'] = item.metadata.values()
         res['files'] = []
@@ -450,17 +450,17 @@ def internetarchive_search(query: str):
     """
     # Create the graph
     graph = create_internetarchive_graph()
-    
+
     # Run the graph with the query
     result = graph.invoke({"query": query, "results": None, "filtered_results": None, "metadata": None, "error": None})
-    
+
     # Return the filtered results or error message
     if result.get("error"):
         return f"Error: {result['error']}"
-    
+
     if not result.get("filtered_results") or len(result.get("filtered_results", [])) == 0:
         return "No relevant documents found in the Internet Archive."
-    
+
     # Format the results
     formatted_results = {
         "items": result.get("filtered_results", []),
@@ -468,15 +468,15 @@ def internetarchive_search(query: str):
         "q": query,
         "k": len(result.get("filtered_results", []))
     }
-    
+
     return json.dumps(formatted_results)
 
 #searchTools = [internet_search, llm_search]
 searchTools = [internetarchive_search]
 
 # Create the agent
-#agent_executor = create_react_agent(llm, searchTools + sqlTools, state_modifier=system_prompt)
-agent_executor = create_react_agent(llm, searchTools, state_modifier=system_prompt)
+agent_executor = create_react_agent(llm, searchTools + sqlTools, prompt=system_prompt)
+#agent_executor = create_react_agent(llm, searchTools, prompt=system_prompt)
 
 # Example usage function
 def ask_agent(question):
@@ -512,6 +512,94 @@ class MessagesInput(BaseModel):
 async def root():
     """Root endpoint that returns a welcome message"""
     return {"message": "Welcome to the Agent API Server"}
+
+@app.get("/rag")
+async def rag():
+    from langchain_core.documents import Document
+    from langchain_core.embeddings import DeterministicFakeEmbedding
+    from langchain_postgres import PGEngine, PGVectorStore
+    from langchain_community.embeddings import OllamaEmbeddings
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    from langchain_community.document_loaders import PyMuPDFLoader
+    import os
+
+    loader = PyMuPDFLoader(r"rag-dataset/gym supplements/1. Analysis of Actual Fitness Supplement.pdf")
+    loader.load()
+    pdfs = []
+    for root, dirs, files in os.walk("rag-dataset"):
+        for file in files:
+            if file.endswith(".pdf"):
+                pdfs.append(os.path.join(root, file))
+    pdfs = []
+    for root, dirs, files in os.walk("rag-dataset"):
+        for file in files:
+            if file.endswith(".pdf"):
+                try:
+                    pdf_path = os.path.join(root, file)
+                    if os.path.isfile(pdf_path) and os.access(pdf_path, os.R_OK):
+                        pdfs.append(pdf_path)
+                except Exception as e:
+                    print(f"Error accessing file {file}: {str(e)}")
+    print(f"Total PDF files found: {len(pdfs)}")
+
+    pdfs
+    docs = []
+    for pdf in pdfs:
+        loader = PyMuPDFLoader(pdf)
+        temp = loader.load()
+        docs.extend(temp)
+
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    chunks = text_splitter.split_documents(docs)
+
+    # len(docs), len(chunks)
+    # docs[0].metadata
+    # len(chunks[0].page_content)
+    # chunks[0].metadata
+    # chunks[1].metadata
+    # chunks[150].metadata
+
+
+    # Replace the connection string with your own Postgres connection string
+    CONNECTION_STRING = "postgresql+psycopg://agent-server:agent-server@pgvector:5432/agent-server"
+    engine = PGEngine.from_connection_string(url=CONNECTION_STRING)
+
+    # Replace the vector size with your own vector size
+    VECTOR_SIZE = 768
+    embedding = DeterministicFakeEmbedding(size=VECTOR_SIZE)
+    embeddings = OllamaEmbeddings(
+        model="nomic-embed-text:latest",
+        base_url='http://localhost:11434'
+    )
+
+    vector = embeddings.embed_query(chunks[0].page_content)
+
+    TABLE_NAME = "nes_documentation"
+
+    engine.init_vectorstore_table(
+        table_name=TABLE_NAME,
+        vector_size=VECTOR_SIZE,
+    )
+
+    store = PGVectorStore.create_sync(
+        engine=engine,
+        table_name=TABLE_NAME,
+        embedding_service=embedding,
+    )
+
+    docs = [
+        Document(page_content="Apples and oranges"),
+        Document(page_content="Cars and airplanes"),
+        Document(page_content="Train")
+    ]
+
+    store.add_documents(docs)
+
+    query = "I'd like a fruit."
+    docs = store.similarity_search(query)
+    return docs
+
 
 @app.get("/test")
 async def test():
@@ -612,6 +700,5 @@ if __name__ == "__main__":
     host = os.getenv("FASTAPI_HOST", "0.0.0.0")
     port = int(os.getenv("FASTAPI_PORT", "8000"))
     uvicorn.run(app, host=host, port=port)
-
 
 

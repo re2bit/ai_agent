@@ -7,44 +7,7 @@ from langgraph.graph import StateGraph
 from ..adapters.internet_archive import InternetArchiveSearchWrapper
 
 
-class InternetArchiveState(TypedDict):
-    """State for the Internet Archive search graph."""
-    query: str
-    results: Optional[List[str]]
-    filtered_results: Optional[List[str]]
-    metadata: Optional[Dict[str, Any]]
-    error: Optional[str]
 
-def search_node(state: InternetArchiveState) -> InternetArchiveState:
-    """
-    Search node for the Internet Archive search graph.
-    Uses the InternetArchiveSearchWrapper to search for items.
-
-    Args:
-        state: The current state with the query
-
-    Returns:
-        Updated state with search results
-    """
-    try:
-        search = InternetArchiveSearchWrapper(k=100, params={})
-        result = search.search(state["query"])
-
-        # Parse the JSON string result
-        result_dict = json.loads(str(result))
-
-        # Update the state
-        return {
-            **state,
-            "results": result_dict.get("items", []),
-            "error": result_dict.get("error")
-        }
-
-    except Exception as e:
-        return {
-            **state,
-            "error": f"Search error: {str(e)}"
-        }
 
 
 def filter_node(state: InternetArchiveState) -> InternetArchiveState:

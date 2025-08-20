@@ -1,18 +1,22 @@
 services:
   pgvector:
+    image: ${BASE_IMAGE-xaer.de/}${PGVECTOR_IMAGE-pgvector}:${PGVECTOR_VERSION-latest}
     container_name: pgvector
     build:
       context: ${INCLUDED_COMPOSED_CONTEXT-./}
       dockerfile: docker/pgvector/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_PGVECTOR_IMAGE-pgvector/pgvector}
+        PGVECTOR_VERSION: ${PGVECTOR_VERSION-pg17-bookworm}
     restart: always
     labels:
       resetableDb: "true"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -U agent-server" ]
       interval: 3s
       timeout: 3s
       retries: 10
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres # CHANGEME
-      POSTGRES_DB: postgres
+      POSTGRES_USER: agent-server
+      POSTGRES_PASSWORD: agent-server
+      POSTGRES_DB: agent-server

@@ -1,5 +1,5 @@
 services:
-  agent-server:
+  as:
     container_name: agent-server
     image: ${BASE_IMAGE-xaer.de/}${AGENT_SERVER_IMAGE-agent-server}:${AGENT_SERVER_VERSION-latest}
     build:
@@ -11,18 +11,20 @@ services:
     develop:
       watch:
         - action: sync+restart
-          path: ./src/agent-server/agent_server.py
-          target: /app/agent_server.py
+          path: ./src/agent-server
+          target: /app
+          ignore: ./src/agent-server/alembic/versions/*
     volumes:
       - ./data:/app/data
+      - ./src/agent-server/alembic/versions:/app/alembic/versions
     environment:
       - FASTAPI_HOST=${FASTAPI_HOST-0.0.0.0}
       - FASTAPI_PORT=${FASTAPI_PORT-8000}
-      - LLM_MODEL=${LLM_MODEL-qwen2.5}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL-qwen2.5}
+      - OLLAMA_URL=${OLLAMA_URL-http://host.docker.internal:11434}
       - SEARX_HOST=${SEARX_HOST-http://host.docker.internal:9080}
       - LANGFUSE_HOST=${SEARX_HOST-http://host.docker.internal:3000}
       - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
       - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
-      - DEBUG=56789
+      - DEBUG=${AGENT_SERVER_PYDEVD_DEBUG_PORT-}
     restart: unless-stopped

@@ -15,6 +15,8 @@ function showHelp() {
     echo "⚪  s,    start-service           Starts a service or all if not specified."           # Check
     echo "⚪  d,    stop-service            Stops a service or all if not specified."            # Check
     echo "⚪  l,    logs                    shows the logs for the Service"                      # Check
+    echo "⚪  m,    migrations              Run Alembic migrations commands in the container."   # Check
+    echo "⚪  w,    watch                   Watch services and rebuild when files change."       # Check
     echo "⚪  ti,   toggle-init             enables/disables init containers"                    # Check
     echo "⚪  td,   toggle-debug            enables/disables debugging for go"                   # Check
     echo "⚪  dpsw, docker-ps-watch         Watches the Services"                                # Check
@@ -84,6 +86,14 @@ function main() {
         l|logs)
             shift
             showLogs "$@"
+            ;;
+        m|migrations)
+            shift
+            migrations "$@"
+            ;;
+        w|watch)
+            shift
+            watch "$@"
             ;;
         ti|toggle-init)
             shift
@@ -374,11 +384,11 @@ function startService() {
     while [[ $# -gt 0 ]]; do
     case "$1" in
       --help)
-        echo "usage: a d [SERVICE]"
+        echo "usage: a s [SERVICE]"
         echo ""
-        echo "Service: The name of the Service like it is defined in the docker-compose.yml"
+        echo "Service: The name of the Service like it is defined in the compose.yml"
         echo ""
-        echo "(If no Service is specified all are stopped)"
+        echo "(If no Service is specified all are started)"
         echo ""
         exit
         ;;
@@ -391,10 +401,23 @@ function startService() {
     esac
   done
 
-  if [ -z "$SERVICE" ]; then
-    docker compose down
-  else
-    docker compose down "$SERVICE"
+
+  if ! COMPOSE_BAKE=true docker compose up -d $SERVICE; then
+     echo -e "❌ \033[31m Error Starting Service(es) \033[0m ❌ "
+     printf "❓ Do you want to See the Logs ? (y/N): "
+     read -r answer
+     if [ "$answer" == "y" ] || [ "$answer" == "Y" ]; then
+         if [ -z "$SERVICE" ]; then
+            docker compose logs
+            echo ""
+            echo "⚠️ Execute a specific Service by name to see only his logs "
+            echo "⚠️ e.G. a s agent-server "
+          else
+            docker compose logs init-"$SERVICE"
+            docker compose logs "$SERVICE"
+        fi
+     echo ""
+     fi
   fi
 }
 
@@ -456,6 +479,34 @@ function toggleDebug() {
   build sca
   cd .. || directoryError
   startService sca
+}
+
+function stopService() {
+    while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --help)
+        echo "usage: a d [SERVICE]"
+        echo ""
+        echo "Service: The name of the Service like it is defined in the compose.yml"
+        echo ""
+        echo "(If no Service is specified all are stopped)"
+        echo ""
+        exit
+        ;;
+      *)
+        if [ -z "$SERVICE" ]; then
+          SERVICE="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  if [ -z "$SERVICE" ]; then
+    docker compose down
+  else
+    docker compose down "$SERVICE"
+  fi
 }
 
 function showLogs() {
@@ -554,48 +605,95 @@ function docker-ps-watch() {
     watch -c "$cmd_ps | awk '$cmd_awk'"
 }
 
-# TODO: Rework Enable Debug
-function enableXdebug() {
-    if [[ "$2" == "--help" || -z "$2" ]]; then
-        echo "usage: a x SERVICE"
+function migrations() {
+    if [[ "$1" == "--help" ]]; then
+        echo "usage: a [m|migrations] [ALEMBIC_COMMAND] [ALEMBIC_OPTIONS]"
         echo ""
-        echo "SERVICE: The name of the service like 'agent-server'"
+        echo "Run Alembic migrations commands in the agent-server(as) container."
         echo ""
-    else
-        SERVICE="$2"
-        if docker compose ps --services | grep -q $SERVICE; then
-            docker compose restart $SERVICE
-            echo -e "\033[42m\033[97m"
-            echo "REMEMBER:"
-            echo "------------------------------------------------------------------------"
-            echo "You need to run Commands from within the Container"
-            echo "It's not only faster, but guarantees the debug config is not overwritten"
-            echo -e "\033[44m\033[97m"
-            echo "./a x SERVICE"
-            echo -e "\033[0m"
-        else
-            echo "Error: Service '$SERVICE' does not exist or is not running."
-        fi
+        echo "Examples:"
+        echo "  a m upgrade head                       # Upgrade to the latest migration"
+        echo "  a migrations revision --autogenerate -m \"description\"  # Create a new migration"
+        echo "  a m history                            # Show migration history"
+        echo "  a m current                            # Show current migration version"
+        echo ""
+        exit 1
     fi
+
+    echo " ⚙️ Running Alembic command in agent-server container"
+    
+    if ! docker compose ps --services --filter "status=running" | grep -q "as"; then
+        echo " ⚠️ agent-server container is not running"
+        echo " ⚙️ Starting agent-server container"
+        docker compose up -d as
+    fi
+    
+    # Execute alembic command in the container
+    # Pass all arguments to alembic
+    docker compose exec -w /app as alembic "$@"
 }
 
-function disableXdebug() {
-    if [[ "$2" == "--help" || -z "$2" ]]; then
-        echo "usage: service xd SERVICE"
-        echo ""
-        echo "SERVICE: The name of the service like 'agent-server'"
-        echo ""
-    else
-        SERVICE="$2"
-        if docker compose ps --services | grep -q $SERVICE; then
-            docker compose exec $SERVICE rm /usr/local/etc/php/conf.d/zz-xdebug.ini
-            docker compose restart $SERVICE
-        else
-            echo "Error: Service '$SERVICE' does not exist or is not running."
-        fi
-    fi
+function watch() {
+    local SERVICE=""
+    local DRY_RUN=""
+    local NO_UP=""
+    local NO_PRUNE=""
+    local QUIET=""
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help)
+                echo "usage: a [w|watch] [OPTIONS] [SERVICE...]"
+                echo ""
+                echo "Watch build context for services and rebuild/refresh containers when files are updated."
+                echo ""
+                echo "Options:"
+                echo "  --dry-run       Execute command in dry run mode"
+                echo "  --no-up         Do not build & start services before watching"
+                echo "  --no-prune      Do not prune dangling images on rebuild"
+                echo "  --quiet         Hide build output"
+                echo "  --help          Show this help message"
+                echo ""
+                echo "Examples:"
+                echo "  a w                             # Watch all services"
+                echo "  a watch as                      # Watch only the agent-server service"
+                echo "  a w --no-up as                  # Watch without starting the service first"
+                echo "  a w --quiet as                  # Watch with minimal output"
+                echo ""
+                exit 0
+                ;;
+            --dry-run)
+                DRY_RUN="--dry-run"
+                shift
+                ;;
+            --no-up)
+                NO_UP="--no-up"
+                shift
+                ;;
+            --no-prune)
+                NO_PRUNE="--prune=false"
+                shift
+                ;;
+            --quiet)
+                QUIET="--quiet"
+                shift
+                ;;
+            *)
+                SERVICE="$SERVICE $1"
+                shift
+                ;;
+        esac
+    done
+    
+    echo " ⚙️ Starting docker compose watch for services:$SERVICE"
+    echo " ℹ️ Press Ctrl+C to stop watching"
+    
+    # Build the command with all options
+    local CMD="docker compose watch $DRY_RUN $NO_UP $NO_PRUNE $QUIET $SERVICE"
+    
+    # Execute the command
+    eval "$CMD"
 }
-
 
 
 main "$@"
