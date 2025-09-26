@@ -21,6 +21,10 @@ include:
     project_directory: ./
   - path: ./docker-compose/pgvector.yml
     project_directory: ./
+  - path: ./docker-compose/homepage.yml
+    project_directory: ./
+  - path: ./docker-compose/mitmproxy.yml
+    project_directory: ./
 volumes:
   searxng_data:
     driver: local

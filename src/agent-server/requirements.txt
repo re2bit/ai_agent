@@ -7,10 +7,11 @@ langchain-core>=0.1.0
 langfuse>=2.0.0
 langchain-community>=0.0.10
 langchain-ollama>=0.0.1
+langchain-openai>=0.3.32
 langchain>=0.0.335
 langgraph>=0.2.43
-pydevd-pycharm~=251.26927.74
 pydevd~=3.3.0
+pydevd-pycharm~=252.23892.439
 internetarchive~=5.5.0
 psycopg[binary]==3.2.9
 langchain-postgres==0.0.15

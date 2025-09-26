@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Homepage Service</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        .services-list ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .services-list li {
+            margin-bottom: 10px;
+        }
+        .services-list a {
+            color: #2980b9;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .services-list a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><b>a</b> Services</h1>
+        <hr/>
+        <div class="services-list">
+            {{if .ServiceLinks}}
+                <ul>
+                    {{range .ServiceLinks}}
+                        <li><a href="{{.URL}}" target="_blank">{{.Name}}</a></li>
+                    {{end}}
+                </ul>
+            {{else}}
+                <p>No active Services found.</p>
+            {{end}}
+        </div>
+    </div>
+</body>
+</html>

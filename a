@@ -14,7 +14,8 @@ function showHelp() {
     echo "⚪  e,    exec                    Execute a command in the given container."           # Check
     echo "⚪  s,    start-service           Starts a service or all if not specified."           # Check
     echo "⚪  d,    stop-service            Stops a service or all if not specified."            # Check
-    echo "⚪  l,    logs                    shows the logs for the Service"                      # Check
+    echo "⚪  l,    logs                    Shows the logs for the Service"                      # Check
+    echo "⚪  lf,   log-follow              Shows and follows the logs for the Service"          # Check
     echo "⚪  m,    migrations              Run Alembic migrations commands in the container."   # Check
     echo "⚪  w,    watch                   Watch services and rebuild when files change."       # Check
     echo "⚪  ti,   toggle-init             enables/disables init containers"                    # Check
@@ -22,6 +23,7 @@ function showHelp() {
     echo "⚪  dpsw, docker-ps-watch         Watches the Services"                                # Check
     echo "⚪  rd,   reset-database          Resets the Database."                                # Check
     echo "⚪  rc,   restart-containers      Stops all local containers and starts new ones."     # Check
+    echo "⚪  o,    open                    Open http://localhost:8080 in the default browser (macOS)"
 
     echo ""
     echo "➖➖➖➖➖➖➖➖➖"
@@ -87,6 +89,10 @@ function main() {
             shift
             showLogs "$@"
             ;;
+        lf|log-follow)
+            shift
+            showLogsFollow "$@"
+            ;;
         m|migrations)
             shift
             migrations "$@"
@@ -107,14 +113,6 @@ function main() {
            shift
            docker-ps-watch "$@"
            ;;
-        at|acceptance-test)
-            shift
-            runAcceptanceTests "$@"
-            ;;
-        ut|unit-test)
-            shift
-            runUnitTests "$@"
-            ;;
         docker-cli-plugin-metadata)
             docker-metadata
             ;;
@@ -128,13 +126,9 @@ function main() {
         rd|reset-database)
             resetDatabase
             ;;
-        sy|sync-repo)
+        o|open)
             shift
-            syncRepo "$@"
-            ;;
-        un|update-napi)
-            shift
-            updateNapi "$@"
+            openLocalhost "$@"
             ;;
         *)
             echo -e "\033[31m'$1' is not a known Command.\033[0m"
@@ -181,7 +175,8 @@ function checkDependencies() {
     DOCKERFILE_PATH="./docker/a/Dockerfile"
 
     if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
-        docker build -q -f "$DOCKERFILE_PATH" -t "$IMAGE_NAME" . >/dev/null 2>&1
+        echo " ⚙️ Building Service Logo Image"
+        docker build -f "$DOCKERFILE_PATH" -t "$IMAGE_NAME" .
     fi
 
     docker run --rm -t "$IMAGE_NAME" 2>/dev/null
@@ -475,10 +470,8 @@ function toggleDebug() {
   initSed
   echo "⚠️Toggle Debug"
   $SED -i -E '/# debug switch$/ { /^#/ s/^#//; t; s/^/#/ }' ".env"
-  cd .. || directoryError
-  build sca
-  cd .. || directoryError
-  startService sca
+  build as
+  startService as
 }
 
 function stopService() {
@@ -537,6 +530,37 @@ function showLogs() {
   docker compose logs "$SERVICE"
 }
 
+function showLogsFollow() {
+   while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --help)
+        echo "usage: a lf [SERVICE]"
+        echo ""
+        echo "Service: The name of the Service like it is defined in the docker-compose.yml"
+        echo ""
+        echo "Shows the logs for the Service with follow option enabled"
+        echo "(If no Service is specified all Logs are shown)"
+        echo ""
+        exit
+        ;;
+      *)
+        if [ -z "$SERVICE" ]; then
+          SERVICE="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  echo " ⚙️ Following logs for service: $SERVICE"
+  echo " ℹ️ Press Ctrl+C to stop following"
+
+  trap ":" INT
+  while true ; do
+    docker compose logs --follow "$SERVICE"
+  done
+}
+
 function restartContainers() {
     if [[ "$1" == "--help" ]]; then
         echo "usage: a rc "
@@ -586,6 +610,7 @@ fi
 
 function docker-ps-watch() {
     echo " ⚙️ Watching Services"
+    echo ""
 
     local cmd_ps='docker compose ps --format "table {{.Service}}\t{{.Status}}"'
     # shellcheck disable=SC2016
@@ -599,10 +624,7 @@ function docker-ps-watch() {
 
     initSed
 
-    local cmd_awk
-    cmd_awk=$(echo "$awk_script" | tr "\n" " " | $SED 's/  */ /g')
-
-    watch -c "$cmd_ps | awk '$cmd_awk'"
+    command "watch" "-c" "$cmd_ps | awk '$awk_script'"
 }
 
 function migrations() {
@@ -627,10 +649,15 @@ function migrations() {
         echo " ⚙️ Starting agent-server container"
         docker compose up -d as
     fi
-    
-    # Execute alembic command in the container
-    # Pass all arguments to alembic
-    docker compose exec -w /app as alembic "$@"
+
+    args=("$@")
+
+    if [ $# -eq 0 ]; then
+      args=("upgrade" "head")
+    fi
+
+    echo "${args[@]}"
+    docker compose exec -w /app as alembic "${args[@]}"
 }
 
 function watch() {
@@ -688,12 +715,41 @@ function watch() {
     echo " ⚙️ Starting docker compose watch for services:$SERVICE"
     echo " ℹ️ Press Ctrl+C to stop watching"
     
-    # Build the command with all options
-    local CMD="docker compose watch $DRY_RUN $NO_UP $NO_PRUNE $QUIET $SERVICE"
-    
-    # Execute the command
+    local CMD="docker --log-level=debug compose watch $DRY_RUN $NO_UP $NO_PRUNE $QUIET $SERVICE"
     eval "$CMD"
 }
 
+
+function openLocalhost() {
+    local URL="http://localhost:8080"
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help)
+                echo "usage: a [o|open] [--help]"
+                echo ""
+                echo "Open $URL in the default browser."
+                echo ""
+                echo "Options:"
+                echo "  --help    Show this help message"
+                return 0
+                ;;
+            *)
+                echo "Error: Unknown option: $1"
+                echo "Run 'a open --help' for usage information"
+                return 1
+                ;;
+        esac
+    done
+
+    echo "Open this URL in your browser: $URL"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        open "$URL"
+    else
+        if command -v xdg-open >/dev/null 2>&1; then
+            xdg-open "$URL"
+        fi
+    fi
+}
 
 main "$@"

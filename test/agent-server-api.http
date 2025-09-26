@@ -1,0 +1,25 @@
+###
+GET http://{{hostAndPort}}/
+
+###
+POST http://{{hostAndPort}}/ask
+Content-Type: application/json
+
+{
+  "question": ""
+}
+
+###
+POST http://{{hostAndPort}}/stream
+Accept: 'text/event-stream',
+Content-Type: application/json
+
+{
+  "question": "Gibt es Daten zu mario bros"
+}
+
+###
+GET http://{{hostAndPort}}/healthcheck
+
+###
+GET http://{{hostAndPort}}/test

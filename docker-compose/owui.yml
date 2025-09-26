@@ -11,5 +11,8 @@ services:
     restart: always
     environment:
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL-http://host.docker.internal:11434}
+      - ADMIN_USER_EMAIL=${OWUI_ADMIN_USER_EMAIL-root@ai.de}
+      - ADMIN_USER_PASSWORD=${OWUI_ADMIN_USER_PASSWORD-toor}
+      - WEBUI_SECRET_KEY=${OWUI_SECRET_KEY-}
     volumes:
       - open-webui:/app/backend/data

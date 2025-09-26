@@ -1,0 +1,8 @@
+services:
+  mitm:
+    image: ${BASE_IMAGE-}${MITMPROXY_IMAGE-mitmproxy/mitmproxy}:${MITMPROXY_VERSION-12.1.2}
+    container_name: mitmproxy
+    restart: always
+    ports:
+      - "${MITMPROXY_WEB_PORT_PUBLIC-8088}:${MITMPROXY_WEB_PORT_INTERNAL-8081}"      # web UI (mitmweb)
+    command: [ "mitmweb", "--web-host", "0.0.0.0", "--set", "web_password=toor" ]

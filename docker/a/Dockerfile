@@ -1,9 +1,7 @@
-FROM alpine:latest
+FROM ruby:3.2.9-alpine3.21
 
 RUN apk add --no-cache \
     figlet \
-    ruby \
-    ruby-dev \
     && gem install lolcat
 
 CMD figlet -f big "        a        " | lolcat && \

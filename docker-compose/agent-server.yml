@@ -1,4 +1,22 @@
 services:
+  init-as:
+    container_name: init-agent-server
+    image: ${BASE_IMAGE-xaer.de/}${INIT_AGENT_SERVER_IMAGE-init-agent-server}:${AGENT_SERVER_VERSION-latest}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/agent-server/Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_AGENT_SERVER_IMAGE-python}
+        PYTHON_VERSION: ${PYTHON_VERSION-3.13.7-alpine3.22}
+    command: alembic upgrade head
+    working_dir: /app
+    volumes:
+      - ./src/agent-server:/app
+      - ./src/agent-server/alembic/versions:/app/alembic/versions
+    depends_on:
+      pgvector:
+        condition: service_healthy
+
   as:
     container_name: agent-server
     image: ${BASE_IMAGE-xaer.de/}${AGENT_SERVER_IMAGE-agent-server}:${AGENT_SERVER_VERSION-latest}
@@ -7,24 +25,38 @@ services:
       dockerfile: docker/agent-server/Dockerfile
       args:
         BASE_IMAGE: ${BASE_AGENT_SERVER_IMAGE-python}
-        PYTHON_VERSION: ${PYTHON_VERSION-3.10-slim}
+        PYTHON_VERSION: ${PYTHON_VERSION-3.13.7-alpine3.22}
     develop:
       watch:
         - action: sync+restart
           path: ./src/agent-server
           target: /app
-          ignore: ./src/agent-server/alembic/versions/*
+          ignore:
+            - "alembic/versions/**"
+            - "**/__pycache__/**"
+            - "**/*.pyc"
+            - "data/**"
+            - ".idea/**"
+            - ".vscode/**"
     volumes:
       - ./data:/app/data
-      - ./src/agent-server/alembic/versions:/app/alembic/versions
+      - ./src/agent-server/alembic/versions:/app/alembic/versions:ro
     environment:
       - FASTAPI_HOST=${FASTAPI_HOST-0.0.0.0}
       - FASTAPI_PORT=${FASTAPI_PORT-8000}
       - OLLAMA_MODEL=${OLLAMA_MODEL-qwen2.5}
       - OLLAMA_URL=${OLLAMA_URL-http://host.docker.internal:11434}
+      - OPENAI_MODEL=${OPENI_MODEL-gpt-4.1}
+      - OPENAI_KEY=${OPENAI_KEY-}
       - SEARX_HOST=${SEARX_HOST-http://host.docker.internal:9080}
-      - LANGFUSE_HOST=${SEARX_HOST-http://host.docker.internal:3000}
-      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
-      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
-      - DEBUG=${AGENT_SERVER_PYDEVD_DEBUG_PORT-}
+      - LANGFUSE_HOST=${LANGFUSE_HOST-http://langfuse-web:3000}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_INIT_PROJECT_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_INIT_PROJECT_SECRET_KEY}
+      - AGENT_SERVER_PYDEVD_DEBUG_PORT=${AGENT_SERVER_PYDEVD_DEBUG_PORT}
+      - AGENT_SERVER_PYDEVD_DEBUG_HOST=${AGENT_SERVER_PYDEVD_DEBUG_HOST}
     restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "curl --silent --fail localhost:8000/healthcheck || exit 1" ]
+      interval: 1s
+      timeout: 10s
+      retries: 20

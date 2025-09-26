@@ -1,11 +1,17 @@
+from typing import Any
+
 from dependency_injector import containers, providers
 from langchain_community.utilities import SQLDatabase
+from langchain_openai import ChatOpenAI
 from langchain_core.runnables import RunnableConfig
 from langchain_ollama import ChatOllama
 from langchain_ollama import OllamaEmbeddings
 from langchain_postgres import PGEngine
 from langfuse import Langfuse
 from langfuse.langchain import CallbackHandler
+import logging
+import sys
+from pprint import pformat
 
 from ..ai.prompts import sql_agent as sql_agent_prompt
 from ..ai.agents.sql_agent import SQLAgent
@@ -67,17 +73,72 @@ class Container(containers.DeclarativeContainer):
     config.ollama.embedding.model.from_env("OLLAMA_EMBEDDING_MODEL", default="nomic-embed-text:latest")
     config.ollama.url.from_env("OLLAMA_URL", default="http://localhost:11434")
     config.ollama.embedding.vector_size.from_env("OLLAMA_EMBEDDING_VECTOR_SIZE", as_=int, default=768)
+    config.openai.model.from_env("OPENAI_MODEL", default="gpt-4.1")
+    config.openai.api_key.from_env("OPENAI_KEY", required=False)
     ollamaEmbeddings = providers.Singleton(
         OllamaEmbeddings,
         model=config.ollama_embedding_model,
         base_url=config.ollama_url,
     )
+
     ollamaLLM = providers.Singleton(
         ChatOllama,
         model=config.ollama.model,
         base_url=config.ollama.url
     )
+
+    if config.openai.api_key:
+        openAiLLM = providers.Singleton(
+            ChatOpenAI,
+            model=config.openai.model,
+            api_key=config.openai.api_key,
+        )
+
+    llm = ollamaLLM
+    #llm = openAiLLM
+
     vectorSize = providers.Object(config.ollama_embedding_vector_size)
+
+    ########################
+    # 🚀 Logger
+    ########################
+    class _MakeLogger:
+        def __call__(self):
+            try:
+                logger = logging.getLogger(__name__)
+                logger.setLevel(logging.DEBUG)
+                formatter = logging.Formatter(
+                    "%(asctime)s [%(processName)s: %(process)d] [%(threadName)s: %(thread)d] [%(levelname)s] %(name)s: %(message)s")
+
+                stream_handler = logging.StreamHandler(sys.stdout)
+                stream_handler.setFormatter(formatter)
+                logger.addHandler(stream_handler)
+
+                #file_handler = logging.FileHandler("info.log")
+                #file_handler.setFormatter(formatter)
+                #logger.addHandler(file_handler)
+
+                def _debug_var(obj: Any,
+                               name: str = "var",
+                               level: int = logging.DEBUG,
+                               *,
+                               width: int = 100,
+                               compact: bool = True,
+                               sort_dicts: bool = True,
+                               ) -> None:
+                    if not logger.isEnabledFor(level):
+                        return
+                    logger.log(level, "%s:\n%s", name, pformat(obj, width=width, compact=compact, sort_dicts=sort_dicts))
+
+                logger.debug_var = _debug_var
+
+                return logger
+            except Exception:
+                return None
+
+    logger = providers.Singleton(
+        _MakeLogger()
+    )
 
     ########################
     # 🚀 FastAPI Server
@@ -98,8 +159,10 @@ class Container(containers.DeclarativeContainer):
     sql_agent = providers.Singleton(
         SQLAgent,
         db=langchain_postgres,
-        llm=ollamaLLM,
+        llm=llm,
         prompt=sql_agent_prompt,
-        langfuse_config=langfuse_config
+        langfuse_config=langfuse_config,
+        logger=logger,
     )
 
+container = Container()

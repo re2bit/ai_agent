@@ -9,3 +9,8 @@ services:
         PIPELINES_VERSION: ${PIPELINES_BASE_VERSION-main}
     container_name: pipelines
     restart: always
+    develop:
+      watch:
+        - action: rebuild
+          path: ./src/pipelines/agent-pipeline.py
+          target: /app/pipelines/agent-pipeline.py

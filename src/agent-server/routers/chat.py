@@ -3,10 +3,13 @@ from typing import List, Dict, Any
 
 from fastapi import HTTPException, APIRouter
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import HumanMessage
 from dependency_injector.wiring import inject, Provide
-from langfuse import Langfuse
-from ..container.container import container
+from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+
+from ..container.container import Container
+from ..ai.agents.sql_agent import SQLAgent
+from logging import Logger
+
 from pydantic import (
     BaseModel,
 )
@@ -20,40 +23,27 @@ class MessagesInput(BaseModel):
 
 class Routes:
     router: APIRouter
-    langfuse_config: dict
+    agent: SQLAgent
+    logger: Logger
 
     def __call__(self, *args, **kwargs):
         return self.router
 
     @inject
-    def __init__(self, langfuse: dict = Provide[container.langfuse_config]):
-        self.langfuse_config = langfuse
-        router = APIRouter()
-        self.router = router
-        self.route.add_api_route("/ask", self.ask, methods=["POST"])
-        self.route.add_api_route("/stream", self.stream, methods=["POST"])
-        self.router.add_api_route("/test", self.test, methods=["GET"])
-
-    async def test(self):
-        """Test endpoint that runs the example questions from agent.py"""
-        try:
-
-            # Example internet search question
-            search_question = "Is there an Manual for \"Super Mario Bros 2\" available ?"
-            search_result = ask_agent(search_question)
-            search_answer = search_result["messages"][-1].content
-
-            return {
-                "search_question": search_question,
-                "search_answer": search_answer
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+    def __init__(
+            self,
+            agent: SQLAgent = Provide[Container.sql_agent],
+            logging: Logger = Provide[Container.logger]
+    ):
+        self.agent = agent
+        self.logger = logging
+        self.router = APIRouter()
+        self.router.add_api_route("/ask", self.ask, methods=["POST"])
+        self.router.add_api_route("/stream", self.stream, methods=["POST"])
 
     async def ask(self, query_input: QueryInput):
-        """Ask a question to the agent and get the response"""
         try:
-            result = ask_agent(query_input.question)
+            result = self.agent.ask(query_input.question)
             return {"answer": result["messages"][-1].content}
         except Exception as e: raise (HTTPException(status_code=500, detail=str(e)))
 
@@ -70,21 +60,43 @@ class Routes:
                         }
                     ]
                 }
-                yield f"data: {json.dumps(stream_start_msg)}\n\n"
+                yield f"data: {json.dumps(stream_start_msg)}\n"
 
-                # Create the query
-                query = {"messages": [HumanMessage(query_input.question)]}
+                status_message = {
+                    "event": {
+                        "type": "status",
+                        "data": {
+                            "description": "Datenbank Zugriff gestartet",
+                            "done": False,
+                        },
+                    }
+                }
+                yield f"data: {json.dumps(status_message)}\n"
 
-                # Stream the agent's response
-                async for event in agent_executor.astream(
-                    input=query,
-                    config=self.langfuse_config,
-                    stream_mode="values"
-                ):
+                async for event in self.agent.stream(query_input.question):
+                    self.logger.debug_var(obj=event, name="event")
                     if "messages" in event:
-                        for message in event["messages"]:
-                            if hasattr(message, "content") and message.content:
-                                # Create a message with the content
+                        message = event["messages"][-1]
+                        #for message in event["messages"]:
+                        if isinstance(message, HumanMessage):
+                            continue
+                        if not isinstance(message, AIMessage):
+                            continue
+                        if hasattr(message, "content") and message.content:
+                            if (hasattr(message, "tool_calls") and message.tool_calls) or isinstance(message, ToolMessage):
+                               content_msg = {
+                                    'choices':
+                                        [
+                                            {
+                                                'delta':
+                                                    {
+                                                        'reasoning_content': message.content,
+                                                    },
+                                                'finish_reason': None
+                                            }
+                                        ]
+                                }
+                            else:
                                 content_msg = {
                                     'choices': [
                                         {
@@ -95,9 +107,19 @@ class Routes:
                                         }
                                     ]
                                 }
-                                yield f"data: {json.dumps(content_msg)}\n\n"
+                            yield f"data: {json.dumps(content_msg)}\n"
 
-                # Stream end message
+                status_end_message = {
+                    "event": {
+                        "type": "status",
+                        "data": {
+                            "description": "Datenbank Zugriff beendet",
+                            "done": True
+                        },
+                    }
+                }
+                yield f"data: {json.dumps(status_end_message)}\n"
+
                 stream_end_msg = {
                     'choices': [
                         {
@@ -106,14 +128,14 @@ class Routes:
                         }
                     ]
                 }
-                yield f"data: {json.dumps(stream_end_msg)}\n\n"
+                yield f"data: {json.dumps(stream_end_msg)}\n"
 
             except Exception as e:
                 print(f"An error occurred: {e}")
                 error_msg = {
                     'error': str(e)
                 }
-                yield f"data: {json.dumps(error_msg)}\n\n"
+                yield f"data: {json.dumps(error_msg)}\n"
 
         return StreamingResponse(
             event_stream(),

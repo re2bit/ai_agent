@@ -1,0 +1,375 @@
+# Agent Pipeline
+
+###
+# group: v1 / pipelines
+# @name List Pipelines
+GET {{baseUrl}}/v1/pipelines
+Authorization: Bearer {{bearerToken}}
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/pipelines
+
+###
+# group: v1 / pipelines
+# @name Add Pipeline
+POST {{baseUrl}}/v1/pipelines/add
+Authorization: Bearer {{bearerToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "url": "string"
+}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/pipelines/add
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/v1/pipelines/add
+
+###
+# group: v1 / pipelines
+# @name Upload Pipeline
+POST {{baseUrl}}/v1/pipelines/upload
+Authorization: Bearer {{bearerToken}}
+Content-Type: multipart/form-data
+Accept: application/json
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename=""
+
+< 
+--WebAppBoundary
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/pipelines/upload
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/v1/pipelines/upload
+
+###
+# group: v1 / pipelines
+# @name Delete Pipeline
+DELETE {{baseUrl}}/v1/pipelines/delete
+Authorization: Bearer {{bearerToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "id": "string"
+}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/pipelines/delete
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/v1/pipelines/delete
+
+###
+# group: v1 / pipelines
+# @name Reload Pipelines
+POST {{baseUrl}}/v1/pipelines/reload
+Authorization: Bearer {{bearerToken}}
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/pipelines/reload
+
+###
+# group: v1 / {pipeline_id} / valves
+# @name Get Valves
+GET {{baseUrl}}/v1/{{pipeline_id}}/valves
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/{{pipeline_id_1}}/valves
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/v1/{{pipeline_id_2}}/valves
+
+###
+# group: v1 / {pipeline_id} / valves
+# @name Get Valves Spec
+GET {{baseUrl}}/v1/{{pipeline_id_3}}/valves/spec
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/{{pipeline_id_4}}/valves/spec
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/v1/{{pipeline_id_5}}/valves/spec
+
+###
+# group: v1 / {pipeline_id} / valves
+# @name Update Valves
+POST {{baseUrl}}/v1/{{pipeline_id_6}}/valves/update
+Content-Type: application/json
+Accept: application/json
+
+{}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/{{pipeline_id_7}}/valves/update
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/v1/{{pipeline_id_8}}/valves/update
+
+###
+# group: v1 / {pipeline_id} / filter
+# @name Filter Inlet
+POST {{baseUrl}}/v1/{{pipeline_id_9}}/filter/inlet
+Content-Type: application/json
+Accept: application/json
+
+{
+  "body": {},
+  "user": {}
+}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/{{pipeline_id_10}}/filter/inlet
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/v1/{{pipeline_id_11}}/filter/inlet
+
+###
+# group: v1 / {pipeline_id} / filter
+# @name Filter Outlet
+POST {{baseUrl}}/v1/{{pipeline_id_12}}/filter/outlet
+Content-Type: application/json
+Accept: application/json
+
+{
+  "body": {},
+  "user": {}
+}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/{{pipeline_id_13}}/filter/outlet
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/v1/{{pipeline_id_14}}/filter/outlet
+
+###
+# group: v1
+# @name Get Status
+GET {{baseUrl}}/v1
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1
+
+###
+# group: v1
+# @name Get Models
+# Returns the available pipelines
+GET {{baseUrl}}/v1/models
+Authorization: Bearer {{bearerToken}}
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/models
+
+###
+# group: v1
+# @name Generate Openai Chat Completion
+POST {{baseUrl}}/v1/chat/completions
+Content-Type: application/json
+Accept: application/json
+
+{
+  "model": "Retro Nerds - Agent",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Kannst du mir etwas zu Super Mario Bros sagen ?"
+    }
+  ],
+  "stream": true
+}
+
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/v1/chat/completions
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/v1/chat/completions
+
+###
+# group: pipelines
+# @name List Pipelines
+GET {{baseUrl}}/pipelines
+Authorization: Bearer {{bearerToken}}
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/pipelines
+
+###
+# group: pipelines
+# @name Add Pipeline
+POST {{baseUrl}}/pipelines/add
+Authorization: Bearer {{bearerToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "url": "string"
+}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/pipelines/add
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/pipelines/add
+
+###
+# group: pipelines
+# @name Upload Pipeline
+POST {{baseUrl}}/pipelines/upload
+Authorization: Bearer {{bearerToken}}
+Content-Type: multipart/form-data
+Accept: application/json
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename=""
+
+< 
+--WebAppBoundary
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/pipelines/upload
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/pipelines/upload
+
+###
+# group: pipelines
+# @name Delete Pipeline
+DELETE {{baseUrl}}/pipelines/delete
+Authorization: Bearer {{bearerToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "id": "string"
+}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/pipelines/delete
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/pipelines/delete
+
+###
+# group: pipelines
+# @name Reload Pipelines
+POST {{baseUrl}}/pipelines/reload
+Authorization: Bearer {{bearerToken}}
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/pipelines/reload
+
+###
+# group: {pipeline_id} / valves
+# @name Get Valves
+GET {{baseUrl}}/{{pipeline_id_15}}/valves
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/{{pipeline_id_16}}/valves
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/{{pipeline_id_17}}/valves
+
+###
+# group: {pipeline_id} / valves
+# @name Get Valves Spec
+GET {{baseUrl}}/{{pipeline_id_18}}/valves/spec
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/{{pipeline_id_19}}/valves/spec
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/{{pipeline_id_20}}/valves/spec
+
+###
+# group: {pipeline_id} / valves
+# @name Update Valves
+POST {{baseUrl}}/{{pipeline_id_21}}/valves/update
+Content-Type: application/json
+Accept: application/json
+
+{}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/{{pipeline_id_22}}/valves/update
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/{{pipeline_id_23}}/valves/update
+
+###
+# group: {pipeline_id} / filter
+# @name Filter Inlet
+POST {{baseUrl}}/{{pipeline_id_24}}/filter/inlet
+Content-Type: application/json
+Accept: application/json
+
+{
+  "body": {},
+  "user": {}
+}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/{{pipeline_id_25}}/filter/inlet
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/{{pipeline_id_26}}/filter/inlet
+
+###
+# group: {pipeline_id} / filter
+# @name Filter Outlet
+POST {{baseUrl}}/{{pipeline_id_27}}/filter/outlet
+Content-Type: application/json
+Accept: application/json
+
+{
+  "body": {},
+  "user": {}
+}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/{{pipeline_id_28}}/filter/outlet
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/{{pipeline_id_29}}/filter/outlet
+
+###
+# @name Get Models
+# Returns the available pipelines
+GET {{baseUrl}}/models
+Authorization: Bearer {{bearerToken}}
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/models
+
+###
+# @name Get Status
+GET {{baseUrl}}/
+Accept: application/json
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/
+
+###
+# @name Generate Openai Chat Completion
+POST {{baseUrl}}/chat/completions
+Content-Type: application/json
+Accept: application/json
+
+{
+  "model": "string",
+  "messages": [
+    {
+      "role": "string",
+      "content": "string"
+    },
+    {
+      "role": "string",
+      "content": "string"
+    }
+  ],
+  "stream": true
+}
+
+<> ./Agent Pipeline_responses/successful_response.200.json
+// {{baseUrl}}/chat/completions
+<> ./Agent Pipeline_responses/validation_error.422.json
+// {{baseUrl}}/chat/completions

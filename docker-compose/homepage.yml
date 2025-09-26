@@ -1,0 +1,18 @@
+services:
+  homepage:
+    image: ${BASE_IMAGE-xaer.de/}${HOMEPAGE_IMAGE-homepage}:${HOMEPAGE_VERSION-latest}
+    build:
+      context: ${INCLUDED_COMPOSED_CONTEXT-./}
+      dockerfile: docker/homepage/Dockerfile
+    container_name: homepage
+    restart: always
+    ports:
+      - "${HOMEPAGE_PORT_PUBLIC}:8080"
+    environment:
+      - PORT=${HOMEPAGE_PORT_PUBLIC}
+      - AGENT_SERVER_PORT_PUBLIC=${AGENT_SERVER_PORT_PUBLIC}
+      - LANGFUSE_WEB_PORT_PUBLIC=${LANGFUSE_WEB_PORT_PUBLIC}
+      - OWUI_PORT_PUBLIC=${OWUI_PORT_PUBLIC}
+      - SEARXNG_PORT_PUBLIC=${SEARXNG_PORT_PUBLIC}
+      - PIPELINES_PORT_PUBLIC=${PIPELINES_PORT_PUBLIC}
+      - MITMPROXY_WEB_PORT_PUBLIC=${MITMPROXY_WEB_PORT_PUBLIC}

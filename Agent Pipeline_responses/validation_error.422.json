@@ -1,0 +1,20 @@
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        "string"
+      ],
+      "msg": "string",
+      "type": "string"
+    },
+    {
+      "loc": [
+        "string",
+        "string"
+      ],
+      "msg": "string",
+      "type": "string"
+    }
+  ]
+}

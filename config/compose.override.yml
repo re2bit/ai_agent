@@ -1,33 +1,41 @@
 services:
   agent-server:
     ports:
-      - "8000:8000"
+      - "${AGENT_SERVER_PORT_PUBLIC}:8000"
+    depends_on:
+      pgvector:
+        condition: service_healthy
+      init-as:                                     # init dependency
+        condition: service_completed_successfully  # init dependency
   searxng:
     ports:
-      - "8080:8080"
+      - "${SEARXNG_PORT_PUBLIC}:8080"
   langfuse-worker:
     ports:
-      - "3030:3030"
+      - "${LANGFUSE_WORKER_PORT_PUBLIC}:3030"
   langfuse-web:
     ports:
-      - "3000:3000"
+      - "${LANGFUSE_WEB_PORT_PUBLIC}:3000"
   clickhouse:
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "${CLICKHOUSE_HTTP_PORT_PUBLIC}:8123"
+      - "${CLICKHOUSE_NATIVE_PORT_PUBLIC}:9000"
   minio:
     ports:
-      - "9090:9000"
-      - "9091:9001"
+      - "${MINIO_API_PORT_PUBLIC}:9000"
+      - "${MINIO_CONSOLE_PORT_PUBLIC}:9001"
   redis:
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT_PUBLIC}:6379"
   postgres:
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT_PUBLIC}:5432"
   owui:
     ports:
-      - "3001:8080"
+      - "${OWUI_PORT_PUBLIC}:8080"
+  pipelines:
+    ports:
+      - "${PIPELINES_PORT_PUBLIC}:9099"
 #  pgvector:
 #    volumes:
 #      - pgvector_data:/var/lib/postgresql/data
