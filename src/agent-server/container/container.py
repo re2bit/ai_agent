@@ -15,6 +15,7 @@ from pprint import pformat
 
 from ..ai.prompts import sql_agent as sql_agent_prompt
 from ..ai.agents.sql_agent import SQLAgent
+from ..renderer.open_webui import OpenWebUiRenderer
 
 
 class Container(containers.DeclarativeContainer):
@@ -163,6 +164,14 @@ class Container(containers.DeclarativeContainer):
         prompt=sql_agent_prompt,
         langfuse_config=langfuse_config,
         logger=logger,
+    )
+
+    ########################
+    #  ⚡️ Open Web UI
+    ########################
+    renderer = providers.Singleton(
+        OpenWebUiRenderer,
+        logger=logger
     )
 
 container = Container()
