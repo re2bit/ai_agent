@@ -36,6 +36,9 @@ services:
   pipelines:
     ports:
       - "${PIPELINES_PORT_PUBLIC}:9099"
+  homepage:
+    ports:
+      - "${HOMEPAGE_PORT_PUBLIC}:8080"
 #  pgvector:
 #    volumes:
 #      - pgvector_data:/var/lib/postgresql/data

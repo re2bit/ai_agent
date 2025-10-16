@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+DOCKER_CMD="${DOCKER_CMD:-docker}"
+
 function showHelp() {
     echo ""
     echo "a"
@@ -145,7 +147,7 @@ function main() {
 function checkDependencies() {
   set +e
   local STATUS
-  docker info > /dev/null 2>&1
+  $DOCKER_CMD info > /dev/null 2>&1
   STATUS=$?
 
   if [ $STATUS -ne 0 ]; then
@@ -174,12 +176,12 @@ function checkDependencies() {
     local DOCKERFILE_PATH
     DOCKERFILE_PATH="./docker/a/Dockerfile"
 
-    if ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+    if ! $DOCKER_CMD image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
         echo " ⚙️ Building Service Logo Image"
-        docker build -f "$DOCKERFILE_PATH" -t "$IMAGE_NAME" .
+        $DOCKER_CMD build -f "$DOCKERFILE_PATH" -t "$IMAGE_NAME" .
     fi
 
-    docker run --rm -t "$IMAGE_NAME" 2>/dev/null
+    $DOCKER_CMD run --rm -t "$IMAGE_NAME" 2>/dev/null
   fi
 
   set -e
@@ -275,7 +277,7 @@ function build() {
 
   echo " ⚙️ Start Building Service '$SERVICE'"
 
-  COMPOSE_BAKE=true docker compose build "$SERVICE"
+  COMPOSE_BAKE=true $DOCKER_CMD compose build "$SERVICE"
 }
 
 function build-multi-arch() {
@@ -320,13 +322,13 @@ function build-multi-arch() {
     exit 1
   fi
 
-  if ! docker buildx ls --format "{{.Name}}" | grep multi_arch_builder; then
+  if ! $DOCKER_CMD buildx ls --format "{{.Name}}" | grep multi_arch_builder; then
     echo  "⚠️ Multi Arch Builder not found, creating"
-    docker buildx create --name multi_arch_builder --use --config buildkitd.toml
+    $DOCKER_CMD buildx create --name multi_arch_builder --use --config buildkitd.toml
     echo " ✅ Done creating Multi Arch Builder"
   fi
 
-  if ! BUILDX_BAKE_ENTITLEMENTS_FS=0 docker buildx bake --set "*.ssh=default" "$SERVICE" --push; then
+  if ! BUILDX_BAKE_ENTITLEMENTS_FS=0 $DOCKER_CMD buildx bake --set "*.ssh=default" "$SERVICE" --push; then
       echo  "❌ Service '$SERVICE' is not build"
       exit 1
   fi
@@ -345,11 +347,11 @@ IsBaseImage() {
   if command -v yq &>/dev/null; then
     yq_cmd=(yq e "${query}" -)
   else
-    yq_cmd=(docker run --rm -i --entrypoint yq linuxserver/yq e "${query}" -)
+    yq_cmd=($DOCKER_CMD run --rm -i --entrypoint yq linuxserver/yq e "${query}" -)
   fi
 
   local hasBaseImageTag
-  hasBaseImageTag=$(docker compose --profile internal config | "${yq_cmd[@]}")
+  hasBaseImageTag=$($DOCKER_CMD compose --profile internal config | "${yq_cmd[@]}")
 
   if [ -z "$hasBaseImageTag" ] || [ "$hasBaseImageTag" = "null" ]; then
     echo "⚠️  The given Image '$image' is no Base Image, Label 'BaseImage' missing."
@@ -372,7 +374,7 @@ function execCommand() {
 
     echo " ⚙️ Executing Command '${CMD[*]}' in '$SERVICE'"
 
-    docker compose exec "$SERVICE" "${CMD[@]}"
+    $DOCKER_CMD compose exec "$SERVICE" "${CMD[@]}"
 }
 
 function startService() {
@@ -397,19 +399,19 @@ function startService() {
   done
 
 
-  if ! COMPOSE_BAKE=true docker compose up -d $SERVICE; then
+  if ! COMPOSE_BAKE=true $DOCKER_CMD compose up -d $SERVICE; then
      echo -e "❌ \033[31m Error Starting Service(es) \033[0m ❌ "
      printf "❓ Do you want to See the Logs ? (y/N): "
      read -r answer
      if [ "$answer" == "y" ] || [ "$answer" == "Y" ]; then
          if [ -z "$SERVICE" ]; then
-            docker compose logs
+            $DOCKER_CMD compose logs
             echo ""
             echo "⚠️ Execute a specific Service by name to see only his logs "
             echo "⚠️ e.G. a s agent-server "
           else
-            docker compose logs init-"$SERVICE"
-            docker compose logs "$SERVICE"
+            $DOCKER_CMD compose logs init-"$SERVICE"
+            $DOCKER_CMD compose logs "$SERVICE"
         fi
      echo ""
      fi
@@ -496,9 +498,9 @@ function stopService() {
   done
 
   if [ -z "$SERVICE" ]; then
-    docker compose down
+    $DOCKER_CMD compose down
   else
-    docker compose down "$SERVICE"
+    $DOCKER_CMD compose down "$SERVICE"
   fi
 }
 
@@ -524,10 +526,10 @@ function showLogs() {
     esac
   done
 
-  if ! docker compose logs init-"$SERVICE"; then
+  if ! $DOCKER_CMD compose logs init-"$SERVICE"; then
       echo "⚠️Could not display init Container Logs, skipping"
   fi
-  docker compose logs "$SERVICE"
+  $DOCKER_CMD compose logs "$SERVICE"
 }
 
 function showLogsFollow() {
@@ -557,7 +559,7 @@ function showLogsFollow() {
 
   trap ":" INT
   while true ; do
-    docker compose logs --follow "$SERVICE"
+    $DOCKER_CMD compose logs --follow "$SERVICE"
   done
 }
 
@@ -570,27 +572,27 @@ function restartContainers() {
         exit 1
     fi
 
-    docker compose down && docker compose up -d
+    $DOCKER_CMD compose down && $DOCKER_CMD compose up -d
 }
 
 function resetDatabase() {
     echo " ⚙️ Finding services with resetableDb label"
     local resetable_services
-    resetable_services=$(docker compose config --format json | jq -r '.services | to_entries[] | select(.value.labels.resetableDb != null) | .key')
-    
+    resetable_services=$($DOCKER_CMD compose config --format json | jq -r '.services | to_entries[] | select(.value.labels.resetableDb != null) | .key')
+
     if [ -z "$resetable_services" ]; then
         echo " ⚠️ No services with resetableDb label found"
         return 1
     fi
-    
+
     echo " ℹ️ Found services with resetableDb label: $resetable_services"
-    
+
     for service in $resetable_services; do
         echo " ⚙️ Restarting service: $service"
         echo " ⚙️ Stopping $service"
-        docker compose down "$service"
+        $DOCKER_CMD compose down "$service"
         echo " ⚙️ Starting $service"
-        docker compose up -d "$service"
+        $DOCKER_CMD compose up -d "$service"
         echo " ✅ Service $service restarted"
     done
 }
@@ -612,7 +614,7 @@ function docker-ps-watch() {
     echo " ⚙️ Watching Services"
     echo ""
 
-    local cmd_ps='docker compose ps --format "table {{.Service}}\t{{.Status}}"'
+    local cmd_ps="$DOCKER_CMD compose ps --format \"table {{.Service}}\\t{{.Status}}\""
     # shellcheck disable=SC2016
     local awk_script='
         NR==1 { print; next }
@@ -643,11 +645,11 @@ function migrations() {
     fi
 
     echo " ⚙️ Running Alembic command in agent-server container"
-    
-    if ! docker compose ps --services --filter "status=running" | grep -q "as"; then
+
+    if ! $DOCKER_CMD compose ps --services --filter "status=running" | grep -q "as"; then
         echo " ⚠️ agent-server container is not running"
         echo " ⚙️ Starting agent-server container"
-        docker compose up -d as
+        $DOCKER_CMD compose up -d as
     fi
 
     args=("$@")
@@ -657,7 +659,7 @@ function migrations() {
     fi
 
     echo "${args[@]}"
-    docker compose exec -w /app as alembic "${args[@]}"
+    $DOCKER_CMD compose exec -w /app as alembic "${args[@]}"
 }
 
 function watch() {
@@ -666,7 +668,7 @@ function watch() {
     local NO_UP=""
     local NO_PRUNE=""
     local QUIET=""
-    
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --help)
@@ -711,11 +713,11 @@ function watch() {
                 ;;
         esac
     done
-    
+
     echo " ⚙️ Starting docker compose watch for services:$SERVICE"
     echo " ℹ️ Press Ctrl+C to stop watching"
-    
-    local CMD="docker --log-level=debug compose watch $DRY_RUN $NO_UP $NO_PRUNE $QUIET $SERVICE"
+
+    local CMD="$DOCKER_CMD --log-level=debug compose watch $DRY_RUN $NO_UP $NO_PRUNE $QUIET $SERVICE"
     eval "$CMD"
 }
 

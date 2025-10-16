@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from dependency_injector import containers, providers
@@ -9,17 +10,62 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_postgres import PGEngine
 from langfuse import Langfuse
 from langfuse.langchain import CallbackHandler
-import logging
-import sys
-from pprint import pformat
 
-from ..ai.prompts import sql_agent as sql_agent_prompt
+from ..ai.prompts.sql_agent import SqlAgent
 from ..ai.agents.sql_agent import SQLAgent
+from ..ai.agents.internet_archive import AgentFactory
 from ..renderer.open_webui import OpenWebUiRenderer
-
+from ..logging.factory import LoggerFactory
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
+
+    ########################
+    # 🚀 Logger
+    ########################
+    logger = providers.Singleton(
+        LoggerFactory()
+    )
+
+    ########################
+    # 🧠 Ollama LLM
+    ########################
+    config.ollama.model.from_env("OLLAMA_MODEL", default="llama3.2:3b")
+    config.ollama.url.from_env("OLLAMA_URL", default="http://localhost:11434")
+    config.openai.model.from_env("OPENAI_MODEL", default="gpt-4.1")
+    config.openai.api_key.from_env("OPENAI_KEY", required=False)
+
+    ollamaLLM = providers.Singleton(
+        ChatOllama,
+        model=config.ollama.model,
+        base_url=config.ollama.url
+    )
+
+    if config.openai.api_key:
+        openAiLLM = providers.Singleton(
+            ChatOpenAI,
+            model=config.openai.model,
+            api_key=config.openai.api_key,
+        )
+
+    llm = ollamaLLM
+    #llm = openAiLLM
+
+    ########################
+    # 🐘 Postgres / PGVector
+    ########################
+    config.pgvector.url.from_env(
+        "PGVECTOR_PGENGINE_URL",
+        default="postgresql+psycopg://agent-server:agent-server@pgvector:5432/agent-server",
+    )
+    pgengine = providers.Singleton(
+        PGEngine.from_connection_string,
+        url=config.pgvector.url
+    )
+    langchain_postgres = providers.Singleton(
+        SQLDatabase.from_uri,
+        database_uri=config.pgvector.url,
+    )
 
     ########################
     # 🔑 Langfuse
@@ -42,7 +88,8 @@ class Container(containers.DeclarativeContainer):
                 return RunnableConfig(
                     callbacks=[CallbackHandler()]
                 )
-            except Exception:
+            except Exception as e:
+                logging.error(f"Langfuse authentication failed: {e}")
                 return None
 
     langfuse_config = providers.Singleton(
@@ -50,96 +97,45 @@ class Container(containers.DeclarativeContainer):
         langfuseClass
      )
 
-    ########################
-    # 🐘 Postgres / PGVector
-    ########################
-    config.pgvector.url.from_env(
-        "PGVECTOR_PGENGINE_URL",
-        default="postgresql+psycopg://agent-server:agent-server@pgvector:5432/agent-server",
-    )
-    pgengine = providers.Singleton(
-        PGEngine.from_connection_string,
-        url=config.pgvector.url
-    )
-    langchain_postgres = providers.Singleton(
-        SQLDatabase.from_uri,
-        database_uri=config.pgvector.url,
+    ################################################
+    #  📚 Internet Archive Agent
+    ################################################
+    internet_archive_agent = providers.Singleton(
+        lambda factory: factory.create(),
+        factory=providers.Singleton(
+            AgentFactory,
+            llm=llm,
+            logger=logger,
+            db=langchain_postgres,
+            langfuse_config=langfuse_config,
+            k=40,
+        )
     )
 
+    internet_archive_graph = providers.Singleton(
+        lambda factory: factory.create_graph(),
+        factory=providers.Singleton(
+            AgentFactory,
+            llm=llm,
+            logger=logger,
+            db=langchain_postgres,
+            langfuse_config=langfuse_config,
+            k=40,
+            data_root="/data/ia"
+        )
+    )
 
     ########################
     # 🧠 Ollama Embeddings
     ########################
-    config.ollama.model.from_env("OLLAMA_MODEL", default="llama3.2:3b")
     config.ollama.embedding.model.from_env("OLLAMA_EMBEDDING_MODEL", default="nomic-embed-text:latest")
-    config.ollama.url.from_env("OLLAMA_URL", default="http://localhost:11434")
     config.ollama.embedding.vector_size.from_env("OLLAMA_EMBEDDING_VECTOR_SIZE", as_=int, default=768)
-    config.openai.model.from_env("OPENAI_MODEL", default="gpt-4.1")
-    config.openai.api_key.from_env("OPENAI_KEY", required=False)
     ollamaEmbeddings = providers.Singleton(
         OllamaEmbeddings,
         model=config.ollama_embedding_model,
         base_url=config.ollama_url,
     )
-
-    ollamaLLM = providers.Singleton(
-        ChatOllama,
-        model=config.ollama.model,
-        base_url=config.ollama.url
-    )
-
-    if config.openai.api_key:
-        openAiLLM = providers.Singleton(
-            ChatOpenAI,
-            model=config.openai.model,
-            api_key=config.openai.api_key,
-        )
-
-    llm = ollamaLLM
-    #llm = openAiLLM
-
     vectorSize = providers.Object(config.ollama_embedding_vector_size)
-
-    ########################
-    # 🚀 Logger
-    ########################
-    class _MakeLogger:
-        def __call__(self):
-            try:
-                logger = logging.getLogger(__name__)
-                logger.setLevel(logging.DEBUG)
-                formatter = logging.Formatter(
-                    "%(asctime)s [%(processName)s: %(process)d] [%(threadName)s: %(thread)d] [%(levelname)s] %(name)s: %(message)s")
-
-                stream_handler = logging.StreamHandler(sys.stdout)
-                stream_handler.setFormatter(formatter)
-                logger.addHandler(stream_handler)
-
-                #file_handler = logging.FileHandler("info.log")
-                #file_handler.setFormatter(formatter)
-                #logger.addHandler(file_handler)
-
-                def _debug_var(obj: Any,
-                               name: str = "var",
-                               level: int = logging.DEBUG,
-                               *,
-                               width: int = 100,
-                               compact: bool = True,
-                               sort_dicts: bool = True,
-                               ) -> None:
-                    if not logger.isEnabledFor(level):
-                        return
-                    logger.log(level, "%s:\n%s", name, pformat(obj, width=width, compact=compact, sort_dicts=sort_dicts))
-
-                logger.debug_var = _debug_var
-
-                return logger
-            except Exception:
-                return None
-
-    logger = providers.Singleton(
-        _MakeLogger()
-    )
 
     ########################
     # 🚀 FastAPI Server
@@ -150,12 +146,12 @@ class Container(containers.DeclarativeContainer):
     fastapi_port = providers.Object(config.fastapi.port)
 
     ########################
-    #  🤖 Prompts
+    #  🤖 SQL Agent
     ########################
     sql_agent_prompt = providers.Singleton(
-        sql_agent_prompt.create,
-       dialect=langchain_postgres.provided.dialect,
-       top_k=5
+        SqlAgent.create,
+        dialect=langchain_postgres.provided.dialect,
+        top_k="5"
     )
     sql_agent = providers.Singleton(
         SQLAgent,
@@ -173,5 +169,6 @@ class Container(containers.DeclarativeContainer):
         OpenWebUiRenderer,
         logger=logger
     )
+
 
 container = Container()

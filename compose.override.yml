@@ -7,42 +7,38 @@ services:
         condition: service_healthy
       init-as:                                     # init dependency
         condition: service_completed_successfully  # init dependency
-  langfuse-web:
-    ports:
-      - "${LANGFUSE_WEB_PORT_PUBLIC}:3000"
-  owui:
-    ports:
-      - "${OWUI_PORT_PUBLIC}:8080"
-    depends_on:
-      - as
-    #environment:
-      #- http_proxy=http://mitm:8080
-  pgvector:
-    ports:
-      - "${PGVECTOR_PORT_PUBLIC}:5432"
-    volumes:
-      - pgvector_data:/var/lib/postgresql/data
-
   searxng:
     ports:
       - "${SEARXNG_PORT_PUBLIC}:8080"
-#  langfuse-worker:
-#    ports:
-#      - "${LANGFUSE_WORKER_PORT_PUBLIC}:3030"
-#  clickhouse:
-#    ports:
-#      - "${CLICKHOUSE_HTTP_PORT_PUBLIC}:8123"
-#      - "${CLICKHOUSE_NATIVE_PORT_PUBLIC}:9000"
-#  minio:
-#    ports:
-#      - "${MINIO_API_PORT_PUBLIC}:9000"
-#      - "${MINIO_CONSOLE_PORT_PUBLIC}:9001"
-#  redis:
-#    ports:
-#      - "${REDIS_PORT_PUBLIC}:6379"
+  langfuse-worker:
+    ports:
+      - "${LANGFUSE_WORKER_PORT_PUBLIC}:3030"
+  langfuse-web:
+    ports:
+      - "${LANGFUSE_WEB_PORT_PUBLIC}:3000"
+  clickhouse:
+    ports:
+      - "${CLICKHOUSE_HTTP_PORT_PUBLIC}:8123"
+      - "${CLICKHOUSE_NATIVE_PORT_PUBLIC}:9000"
+  minio:
+    ports:
+      - "${MINIO_API_PORT_PUBLIC}:9000"
+      - "${MINIO_CONSOLE_PORT_PUBLIC}:9001"
+  redis:
+    ports:
+      - "${REDIS_PORT_PUBLIC}:6379"
   postgres:
     ports:
       - "${POSTGRES_PORT_PUBLIC}:5432"
+  owui:
+    ports:
+      - "${OWUI_PORT_PUBLIC}:8080"
   pipelines:
     ports:
       - "${PIPELINES_PORT_PUBLIC}:9099"
+  homepage:
+    ports:
+      - "${HOMEPAGE_PORT_PUBLIC}:8080"
+#  pgvector:
+#    volumes:
+#      - pgvector_data:/var/lib/postgresql/data

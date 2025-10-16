@@ -11,7 +11,7 @@ from .logging.logfilter import apply_log_filter
 
 from .container.container import container
 
-container.wire(modules=[__name__], packages=[".routers.chat", "app.routers.test"])
+container.wire(modules=[__name__], packages=[".routers.chat", "app.routers.test", "app.routers.root"])
 
 from .routers import test, healthcheck, chat, root
 
@@ -45,6 +45,7 @@ def main() -> None:
     app.include_router(root.Routes()())
     app.include_router(chat.Routes()())
     app.include_router(healthcheck.Routes()())
+    # TODO: add the internet Archive Search here.
     app.include_router(test.Routes()())
     fastapi_port = container.config.fastapi.port()
     fastapi_host = container.config.fastapi.host()

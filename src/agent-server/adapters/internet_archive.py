@@ -1,5 +1,5 @@
 import json
-import json
+import logging
 from typing import Dict, Optional, Any
 
 import internetarchive
@@ -14,7 +14,7 @@ from pydantic import (
 class InternetArchiveSearchResults(dict):
     def __init__(self, params: dict):
         super().__init__()
-        """Take a raw result from Searx and make it into a dict like object."""
+        """Take a raw result from Internet Archive and make it into a dict like object."""
         res = dict()
         res['items'] = []
         res['k'] = params["k"]
@@ -48,6 +48,12 @@ class InternetArchiveSearchWrapper(BaseModel):
     Wrapper Internet Archive search Python Library.
     """
 
+    def __init__(self, **data):
+        logger = data.pop("_logger", None)
+        super().__init__(**data)
+        self._logger = logger or logging.getLogger(__name__)
+
+    _logger: logging.Logger = PrivateAttr()
     _result: InternetArchiveSearchResults = PrivateAttr()
     params: dict = Field()
     query_suffix: Optional[str] = ""
@@ -67,22 +73,24 @@ class InternetArchiveSearchWrapper(BaseModel):
         res = InternetArchiveSearchResults(params)
 
         search = internetarchive.search_items(params["q"])
+        self._logger.debug(f"Search results: {search}")
         for item in search:
             res.add_item(item)
 
         self._result = res
         return res
 
-    def _internetarchive_detail_infos(self, params: dict) -> dict:
+    @staticmethod
+    def _internetarchive_detail_infos(params: dict) -> dict:
         """Actual request to IA API."""
         item = internetarchive.get_item(params["q"])
         files = internetarchive.get_files(params["q"])
 
         res = dict()
-        res['metadata'] = item.metadata.values()
+        res['metadata'] = item.metadata
         res['files'] = []
         for file in files:
-            res['files'].append(file.metadata.values())
+            res['files'].append(file.metadata)
 
         return res
 
@@ -111,7 +119,7 @@ class InternetArchiveSearchWrapper(BaseModel):
             self,
             query: str,
             **kwargs: Any,
-    ) -> str:
+    ) -> dict:
         """
         Run a query through Internet Archive API and parse results.
         """
@@ -124,5 +132,6 @@ class InternetArchiveSearchWrapper(BaseModel):
             params["q"] += " " + self.query_suffix
 
         res = self._internetarchive_detail_infos(params)
+        self._logger.info(f"Item Metadata Results: {res}")
 
         return res

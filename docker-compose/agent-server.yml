@@ -39,7 +39,7 @@ services:
             - ".idea/**"
             - ".vscode/**"
     volumes:
-      - ./data:/app/data
+      - ./data:/data
       - ./src/agent-server/alembic/versions:/app/alembic/versions:ro
     environment:
       - FASTAPI_HOST=${FASTAPI_HOST-0.0.0.0}

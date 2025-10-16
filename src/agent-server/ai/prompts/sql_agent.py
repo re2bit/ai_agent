@@ -1,7 +1,8 @@
-from typing import Callable
+from typing import Final
 from langchain_core.prompts import PromptTemplate
+from pydantic import BaseModel, Field
 
-prompt = PromptTemplate.from_template("""SYSTEM
+_TEMPLATE: Final[str] = """SYSTEM
 You are an agent designed to interact with a SQL database.
 Given an input question, create a syntactically correct {dialect} query to run, then look at the results of the query and return the answer.
 
@@ -47,6 +48,11 @@ Dialect nuances:
 Output:
 - Return concise answers derived from the query results; include the query you ran if helpful.
 - YOU MUST only output Information which are present in the Query Result. DO NOT enrich this Information.:
-""")
+"""
 
-create: Callable[[str, int], str] = lambda dialect, top_k: prompt.format(dialect=dialect, top_k=top_k)
+_PROMPT: Final[PromptTemplate] = PromptTemplate.from_template(_TEMPLATE)
+
+class SqlAgent(BaseModel):
+    @classmethod
+    def create(cls, top_k: str, dialect: str) -> str:
+        return _PROMPT.format(top_k=top_k, dialect=dialect)

@@ -37,22 +37,14 @@ class SQLAgent:
         self.logger = logger
 
     def ask(self, query: str):
-        result = self.executor.invoke(
-            SqlAgentMessage(
-                messages=[HumanMessage(query)]
-            ),
+        return self.executor.invoke(
+            SqlAgentMessage(messages=[HumanMessage(query)]),
             config=self.langfuse_config
         )
 
-        return result
-
     def stream(self, query: str):
         return self.executor.astream(
-            SqlAgentMessage(
-                messages=[
-                    HumanMessage(query)
-                ]
-            ),
+            SqlAgentMessage(messages=[HumanMessage(query)]),
             config=self.langfuse_config,
             stream_mode = "values"
         )
