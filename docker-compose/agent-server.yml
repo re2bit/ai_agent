@@ -9,10 +9,10 @@ services:
         BASE_IMAGE: ${BASE_AGENT_SERVER_IMAGE-python}
         PYTHON_VERSION: ${PYTHON_VERSION-3.13.7-alpine3.22}
     command: alembic upgrade head
-    working_dir: /app
+    working_dir: /src/agent_server
     volumes:
-      - ./src/agent-server:/app
-      - ./src/agent-server/alembic/versions:/app/alembic/versions
+      - ./src/agent_server:/src/agent_server
+      - ./src/agent_server/alembic/versions:/app/alembic/versions
     depends_on:
       pgvector:
         condition: service_healthy
@@ -29,8 +29,8 @@ services:
     develop:
       watch:
         - action: sync+restart
-          path: ./src/agent-server
-          target: /app
+          path: ./src/agent_server
+          target: /src/agent_server
           ignore:
             - "alembic/versions/**"
             - "**/__pycache__/**"
@@ -40,7 +40,7 @@ services:
             - ".vscode/**"
     volumes:
       - ./data:/data
-      - ./src/agent-server/alembic/versions:/app/alembic/versions:ro
+      - ./src/agent_server/alembic/versions:/app/alembic/versions:ro
     environment:
       - FASTAPI_HOST=${FASTAPI_HOST-0.0.0.0}
       - FASTAPI_PORT=${FASTAPI_PORT-8000}

@@ -3,25 +3,18 @@ import logging
 from typing import Any, List, Tuple, Optional, Iterator
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.runnables import RunnableSerializable
-from pydantic import PrivateAttr
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_core.runnables import RunnableSerializable, RunnableConfig, Runnable
+from langchain_core.runnables.utils import Input, Output
+from pydantic import PrivateAttr, BaseModel, Field
 
+from ..prompts.interface import IPromptTemplateFactoryInterface
 from ..prompts.internet_archive import FilterPromptFactory
 from ..states.internet_archive import InternetArchiveState
 from ...adapters.internet_archive import InternetArchiveSearchWrapper
 
 
 class FilterNode(RunnableSerializable):
-    """
-    Filter node for the Internet Archive search graph.
-    Uses the LLM to filter results based on relevance to the query.
-
-    Args:
-        state: The current state with search results
-
-    Returns:
-        Updated state with filtered results
-    """
     llm: BaseChatModel
     prompt_template: FilterPromptFactory
     _logger: logging.Logger = PrivateAttr()
@@ -78,11 +71,6 @@ class FilterNode(RunnableSerializable):
             }
 
 class SearchNode(RunnableSerializable):
-    """
-    Sucht Items im Internet Archive.
-    Erwartet im State: {"query": str}
-    Liefert in den State: {"results": list, "error": Optional[str]}
-    """
 
     ia: InternetArchiveSearchWrapper
     _logger: logging.Logger = PrivateAttr()
@@ -118,11 +106,6 @@ class SearchNode(RunnableSerializable):
             }
 
 class MetadataNode(RunnableSerializable):
-    """
-    Lädt Metadaten für bereits gefilterte Ergebnisse.
-    Erwartet im State: {"filtered_results": list[str]}
-    Liefert in den State: {"metadata": dict[str, Any], "error": Optional[str]}
-    """
 
     ia: InternetArchiveSearchWrapper
     _logger: logging.Logger = PrivateAttr()
@@ -172,3 +155,80 @@ class MetadataNode(RunnableSerializable):
             error = str(e)
             self._logger.error(f"MetadataNode Error: {error}")
             return {**state, "metadata": {}, "error": f"Metadata error: {error}"}
+
+class FilterNodeStructuredOutput(BaseModel):
+   is_this_entry_relevant: bool = Field(description="Whether the entry is relevant to the query")
+
+class FinderNode(Runnable):
+    llm: BaseChatModel
+    prompt_factory: IPromptTemplateFactoryInterface
+    logger: logging.Logger
+
+    def __init__(self, llm, prompt_factory, logger):
+        self.logger = logger or logging.getLogger(__name__)
+        self.llm = llm
+        self.prompt_factory = prompt_factory
+
+    def invoke(self, input: Input, config: Optional[RunnableConfig] = None, **kwargs: Any) -> Output:
+        state: dict = input
+
+        metadata = state.get("metadata") or {}
+        metadata_length = len(metadata)
+        self.logger.info(f"Finder Node invoked with results len: {metadata_length}")
+        if not metadata or metadata_length == 0:
+            return {
+                **state,
+                "entries_to_consider": [],
+                "error": state.get("error") or "No metadata information to check"
+            }
+
+        entries_to_consider = []
+        error = state.get("error") or None
+
+        for name, metadata_info in metadata.items():
+            try:
+                actual_metadata = metadata_info.get("metadata") or {}
+
+                try:
+                    llm = self.llm.with_structured_output(FilterNodeStructuredOutput)
+
+                    prompt = self.prompt_factory.create(
+                        query=state["query"],
+                        name=name,
+                        metadata=actual_metadata,
+                    )
+                    response: FilterNodeStructuredOutput = llm.invoke(prompt)
+
+                except Exception as e:
+                    self.logger.error(f"Error setting structured output: {e}, fallback to Json output parser")
+
+                    parser = JsonOutputParser(pydantic_object=FilterNodeStructuredOutput)
+
+                    prompt = self.prompt_factory.create(
+                        query=state["query"],
+                        name=name,
+                        metadata=actual_metadata,
+                        parser=parser
+                    )
+
+                    llm_response = self.llm.invoke(prompt)
+
+                    response: dict = parser.parse(llm_response.content)
+
+                if response.get("is_this_entry_relevant"):
+                   entries_to_consider.append(name)
+            except Exception as e:
+                if error is None:
+                    error = str(e)
+                else:
+                    error = "\n".join([error, str(e)])
+
+        result = {
+            **state,
+            "entries_to_consider":entries_to_consider,
+        }
+
+        if error:
+            result["error"] = error
+
+        return result

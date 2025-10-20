@@ -18,3 +18,5 @@ langchain-postgres==0.0.15
 alembic==1.16.4
 sqlmodel==0.0.24
 dependency-injector>=4.0,<5.0
+pytest==8.4.2
+charset-normalizer==3.4.4

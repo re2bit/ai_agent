@@ -7,11 +7,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 import uvicorn
 import logging
-from .logging.logfilter import apply_log_filter
+from .log.logfilter import apply_log_filter
 
 from .container.container import container
 
-container.wire(modules=[__name__], packages=[".routers.chat", "app.routers.test", "app.routers.root"])
+container.wire(modules=[__name__], packages=[".routers.chat", ".routers.test", ".routers.root"])
 
 from .routers import test, healthcheck, chat, root
 

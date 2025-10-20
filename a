@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
+# This could be changed to `podman` if you into that
 DOCKER_CMD="${DOCKER_CMD:-docker}"
 
 function showHelp() {
@@ -10,21 +11,22 @@ function showHelp() {
     echo ""
     echo "Commands:"
     echo "➖➖➖➖➖➖➖➖➖"
-    echo "⚪  i,    init                    Initialize the docker compose or update the images." # Check
-    echo "⚪  b,    build                   Build a given Service"                               # Check
-    echo "⚪  bma,  build-multi-arch        Build a given Service for multiple Architectures"    # Check
-    echo "⚪  e,    exec                    Execute a command in the given container."           # Check
-    echo "⚪  s,    start-service           Starts a service or all if not specified."           # Check
-    echo "⚪  d,    stop-service            Stops a service or all if not specified."            # Check
-    echo "⚪  l,    logs                    Shows the logs for the Service"                      # Check
-    echo "⚪  lf,   log-follow              Shows and follows the logs for the Service"          # Check
-    echo "⚪  m,    migrations              Run Alembic migrations commands in the container."   # Check
-    echo "⚪  w,    watch                   Watch services and rebuild when files change."       # Check
-    echo "⚪  ti,   toggle-init             enables/disables init containers"                    # Check
-    echo "⚪  td,   toggle-debug            enables/disables debugging for go"                   # Check
-    echo "⚪  dpsw, docker-ps-watch         Watches the Services"                                # Check
-    echo "⚪  rd,   reset-database          Resets the Database."                                # Check
-    echo "⚪  rc,   restart-containers      Stops all local containers and starts new ones."     # Check
+    echo "⚪  i,    init                    Initialize the docker compose or update the images."
+    echo "⚪  b,    build                   Build a given Service"
+    echo "⚪  bma,  build-multi-arch        Build a given Service for multiple Architectures"
+    echo "⚪  e,    exec                    Execute a command in the given container."
+    echo "⚪  s,    start-service           Starts a service or all if not specified."
+    echo "⚪  d,    stop-service            Stops a service or all if not specified."
+    echo "⚪  l,    logs                    Shows the logs for the Service"
+    echo "⚪  lf,   log-follow              Shows and follows the logs for the Service"
+    echo "⚪  m,    migrations              Run Alembic migrations commands in the container."
+    echo "⚪  w,    watch                   Watch services and rebuild when files change."
+    echo "⚪  ut,   unit-test               Execute Unit Tests."
+    echo "⚪  ti,   toggle-init             enables/disables init containers"
+    echo "⚪  td,   toggle-debug            enables/disables debugging for go"
+    echo "⚪  dpsw, docker-ps-watch         Watches the Services"
+    echo "⚪  rd,   reset-database          Resets the Database."
+    echo "⚪  rc,   restart-containers      Stops all local containers and starts new ones."
     echo "⚪  o,    open                    Open http://localhost:8080 in the default browser (macOS)"
 
     echo ""
@@ -102,6 +104,10 @@ function main() {
         w|watch)
             shift
             watch "$@"
+            ;;
+        ut|unit-test)
+            shift
+            unit-test "$@"
             ;;
         ti|toggle-init)
             shift
@@ -719,6 +725,38 @@ function watch() {
 
     local CMD="$DOCKER_CMD --log-level=debug compose watch $DRY_RUN $NO_UP $NO_PRUNE $QUIET $SERVICE"
     eval "$CMD"
+}
+
+function unit-test() {
+    local TESTS=""
+     while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help)
+                echo "usage: a [ut|unit-test] [test]"
+                echo ""
+                echo "Execute pytest inside the container."
+                echo ""
+                echo "Options:"
+                echo "  --help          Show this help message"
+                echo ""
+                echo "Examples:"
+                echo "  a ut            # Execute Unit Tests"
+                echo ""
+                exit 0
+                ;;
+            *)
+                TESTS="$TESTS $1"
+                shift
+                ;;
+        esac
+    done
+    if [ -z `$DOCKER_CMD ps -q --no-trunc | grep $($DOCKER_CMD compose ps -q as)` ]; then
+      echo " ⚠️ Service not running, going to use \`compose run\`"
+      $DOCKER_CMD compose run --rm as pytest "${args[@]}"
+    else
+      echo " ℹ️ Found running Service, using it"
+      $DOCKER_CMD compose exec as pytest "${args[@]}"
+    fi
 }
 
 

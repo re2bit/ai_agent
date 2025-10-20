@@ -8,4 +8,6 @@ class InternetArchiveState(TypedDict):
     filtered_results: Optional[List[str]]
     cached_filtered_results: Optional[bool]
     metadata: Optional[Dict[str, Any]]
+    cached_metadata: Optional[bool]
+    pdfs_to_download: Optional[List[str]]
     error: Optional[str]

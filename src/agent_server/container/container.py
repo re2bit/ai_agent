@@ -1,5 +1,4 @@
 import logging
-from typing import Any
 
 from dependency_injector import containers, providers
 from langchain_community.utilities import SQLDatabase
@@ -15,7 +14,7 @@ from ..ai.prompts.sql_agent import SqlAgent
 from ..ai.agents.sql_agent import SQLAgent
 from ..ai.agents.internet_archive import AgentFactory
 from ..renderer.open_webui import OpenWebUiRenderer
-from ..logging.factory import LoggerFactory
+from ..log.factory import LoggerFactory
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
