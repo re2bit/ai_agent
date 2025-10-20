@@ -3,3 +3,5 @@ ignore
 __pycache__
 .DS_Store
 data/
+.env
+compose.override.yml
