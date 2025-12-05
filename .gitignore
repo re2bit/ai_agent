@@ -1,3 +1,5 @@
+.expectServiceRunning
+.addBanner
 .idea
 ignore
 __pycache__

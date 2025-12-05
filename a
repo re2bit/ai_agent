@@ -176,7 +176,7 @@ function checkDependencies() {
       fi
   fi
 
-   if [ -a .addBanner ]; then
+   if [ -e .addBanner ]; then
     local IMAGE_NAME
     IMAGE_NAME="a-banner"
     local DOCKERFILE_PATH
@@ -665,7 +665,7 @@ function migrations() {
     fi
 
     echo "${args[@]}"
-    $DOCKER_CMD compose exec -w /app as alembic "${args[@]}"
+    $DOCKER_CMD compose exec -w /src/agent_server as alembic "${args[@]}"
 }
 
 function watch() {
@@ -750,12 +750,19 @@ function unit-test() {
                 ;;
         esac
     done
-    if [ -z `$DOCKER_CMD ps -q --no-trunc | grep $($DOCKER_CMD compose ps -q as)` ]; then
-      echo " ⚠️ Service not running, going to use \`compose run\`"
-      $DOCKER_CMD compose run --rm as pytest "${args[@]}"
-    else
-      echo " ℹ️ Found running Service, using it"
+    if [ -e .expectServiceRunning ]; then
+      echo " ℹ️ Expecting Service to run"
       $DOCKER_CMD compose exec as pytest "${args[@]}"
+    else
+      if [ -z `$DOCKER_CMD ps -q --no-trunc | grep $($DOCKER_CMD compose ps -q as)` ]; then
+        echo " ⚠️ Service not running, going to use \`compose run\`"
+        echo " ℹ️ Start the Service for reuse, this speeds up test execution"
+        $DOCKER_CMD compose run --rm as pytest "${args[@]}"
+      else
+        echo " ℹ️ Found running Service, using it"
+        echo " ℹ️ create file '.expectServiceRunning' File to skip this check"
+        $DOCKER_CMD compose exec as pytest "${args[@]}"
+      fi
     fi
 }
 

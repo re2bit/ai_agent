@@ -1,18 +1,23 @@
 import logging
 from typing import Any
 
-from langchain_community.utilities import SQLDatabase
-from langchain_core.language_models import BaseLanguageModel
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langchain_core.messages.base import BaseMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt.chat_agent_executor import create_react_agent
 from pydantic import BaseModel
-
+from sqlalchemy import Engine
 from ..graphs.internet_archive import InternetArchiveGraphBuilder
-from ..nodes.internet_archive import FilterNode, MetadataNode, SearchNode
-from ..prompts.internet_archive import FilterPromptFactory
+from ..nodes.internet_archive.Search import SearchNode
+from ..nodes.internet_archive.Finder import FinderNode
+from ..nodes.internet_archive.Metadata import MetadataNode
+from ..nodes.internet_archive.Filter import FilterNode
+from ..nodes.internet_archive.FileFinder import FileFinderNode
+from ..nodes.internet_archive.Downloader import DownloaderNode
+from ..nodes.internet_archive.Database import DatabaseNode
+from ..prompts.internet_archive import FilterPromptFactory, FileFinderPromptFactory, FinderPromptFactory
 from ..prompts.internet_archive import AgentPromptFactory
 from ..toolkits.internet_archive import InternetArchiveToolkit
 from ..tools.internet_archive import InternetArchiveSearchTool
@@ -23,25 +28,28 @@ class InternetArchiveMessage(BaseModel):
     messages: list[BaseMessage]
 
 class AgentFactory:
-    llm:BaseLanguageModel
+    llm:BaseChatModel
     logger:logging.Logger
-    db:SQLDatabase
     langfuse_config:RunnableConfig
-    data_root: str | None
+    engine:Engine
+    cache_dir: str | None
+    data_dir: str | None
 
     def __init__(
             self,
-            llm:BaseLanguageModel,
+            llm:BaseChatModel,
             logger:logging.Logger,
-            db:SQLDatabase,
+            engine: Engine,
             langfuse_config:RunnableConfig,
             k:int=40,
-            data_root:str=None
+            cache_dir:str=None,
+            data_dir:str=None
     ):
-        self.data_root = data_root
+        self.cache_dir = cache_dir
+        self.engine = engine
+        self.data_dir = data_dir
         self.llm=llm
         self.logger=logger
-        self.db=db
         self.k=k
         self.langfuse_config=langfuse_config
 
@@ -52,7 +60,6 @@ class AgentFactory:
                 tools=[
                     InternetArchiveSearchTool(
                         llm=self.llm,
-                        db=self.db,
                         logger=self.logger,
                         graph=self.create_graph()
                     )
@@ -68,28 +75,45 @@ class AgentFactory:
         )
 
     def create_graph(self) -> CompiledStateGraph[Any, Any, Any, Any]:
-        return InternetArchiveGraphBuilder(
-            search_node=SearchNode(
-                _logger=self.logger,
-                ia=InternetArchiveSearchWrapper(
+        ia = InternetArchiveSearchWrapper(
                     k=self.k,
                     _logger=self.logger
                 )
+        return InternetArchiveGraphBuilder(
+            search_node=SearchNode(
+                _logger=self.logger,
+                ia=ia,
             ),
             filter_node=FilterNode(
-                _logger=self.logger,
+                logger=self.logger,
                 llm=self.llm,
-                prompt_template=FilterPromptFactory()
+                prompt_factory=FilterPromptFactory()
             ),
             metadata_node=MetadataNode(
                 _logger=self.logger,
-                ia=InternetArchiveSearchWrapper(
-                    k=self.k,
-                    _logger = self.logger
-                )
+                ia=ia
+            ),
+            finder_node=FinderNode(
+                llm=self.llm,
+                logger=self.logger,
+                prompt_factory=FinderPromptFactory(),
+            ),
+            file_finder_node=FileFinderNode(
+                llm=self.llm,
+                logger=self.logger,
+                prompt_factory=FileFinderPromptFactory()
+            ),
+            downloader_node=DownloaderNode(
+                logger=self.logger,
+                ia=ia,
+                data_dir=self.data_dir
+            ),
+            database_node=DatabaseNode(
+                engine=self.engine,
+                logger=self.logger
             ),
             logger=self.logger,
-            data_root=self.data_root,
+            cache_dir=self.cache_dir,
         ).build()
 
 

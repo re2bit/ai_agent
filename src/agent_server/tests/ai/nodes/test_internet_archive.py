@@ -7,8 +7,9 @@ from langchain_core.messages import BaseMessage
 from langchain_core.outputs import ChatResult, ChatGeneration
 from typing_extensions import override
 
-from agent_server.ai.nodes.internet_archive import FinderNode
-from agent_server.ai.prompts.internet_archive import FinderPromptFactory
+from agent_server.ai.nodes.internet_archive.Filter import FilterNode
+from agent_server.ai.nodes.internet_archive.Finder import FinderNode
+from agent_server.ai.prompts.internet_archive import FinderPromptFactory, FilterPromptFactory
 from agent_server.ai.states.internet_archive import InternetArchiveState
 
 DATA_VALID:dict={
@@ -248,11 +249,55 @@ class TestFindNode(TestCase):
             logger=logger,
             prompt_factory=prompt_factory
         )
-        state = InternetArchiveState(DATA_VALID)
+        state = InternetArchiveState(**DATA_VALID)
         with self.assertLogs(logger, level=logging.INFO) as cm:
-            result = finder.invoke(input=state)
+            result = finder.invoke(state=state)
         error = result.get("error") or ""
         assert error is ""
         entries_to_consider = result.get("entries_to_consider") or None
         assert entries_to_consider is not None
         assert "super-mario-bros-2-nes-spielanleitung" in entries_to_consider
+
+
+class TestFilterNode(TestCase):
+    response: list[str] = [
+        "{\"filtered_results\":[\"super-mario-bros-2-nes-spielanleitung\"]}"
+    ]
+
+    def test_failed_instantiate(self):
+        try:
+            FilterNode(
+                llm=None,
+                prompt_factory=None,
+                logger=None,
+            )
+            assert False
+        except Exception:
+            assert True
+
+    def test_instantiate(self):
+        llm = FakeListChatModel(responses=self.response)
+        node: FilterNode = FilterNode(
+            llm=llm,
+            prompt_factory=FilterPromptFactory,
+            logger=None,
+        )
+        assert node.__class__.__name__ == "FilterNode"
+
+    def test_invoke_valid_results(self):
+        logger = logging.getLogger(__name__)
+        prompt_factory = FilterPromptFactory
+        llm = FakeListChatModel(responses=self.response)
+        node = FilterNode(
+            llm=llm,
+            prompt_factory=prompt_factory,
+            logger=logger,
+        )
+        state = InternetArchiveState(**DATA_VALID)
+        with self.assertLogs(logger, level=logging.INFO) as cm:
+            result = node.invoke(state=state)
+        error = result.get("error") or ""
+        assert error is ""
+        filtered_results = result.get("filtered_results") or None
+        assert filtered_results is not None
+        assert "super-mario-bros-2-nes-spielanleitung" in filtered_results

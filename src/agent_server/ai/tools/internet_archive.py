@@ -7,13 +7,11 @@ from langchain_core.language_models import BaseChatModel
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field, ConfigDict
 from langchain_core.tools import BaseTool
-from langchain_community.utilities.sql_database import SQLDatabase
 from ..states.internet_archive import InternetArchiveState
 
 class BaseInternetArchiveTool(BaseModel):
     """Base tool for interacting with a SQL database."""
 
-    db: SQLDatabase = Field(exclude=True)
     llm: BaseChatModel = Field(exclude=True)
     graph: CompiledStateGraph = Field(exclude=True)
     logger: logging.Logger|None = Field(exclude=True)

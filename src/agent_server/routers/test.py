@@ -34,7 +34,8 @@ class Routes:
         """Test endpoint that runs the example questions from agent.py"""
         # Example internet search question
         #search_question = "Is there an Manual for \"Super Mario Bros 2\" available ?"
-        search_question = "Super Mario Bros 2 Manual"
+        #search_question = "Super Mario Bros 2 Manual"
+        search_question = "Tetris (Nintendo Entertainment System) Manual"
         #search_result = self.agent.ask(search_question)
         #search_answer = search_result["messages"][-1].content
 

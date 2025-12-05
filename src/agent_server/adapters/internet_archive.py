@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import Dict, Optional, Any
+from pathlib import Path
+from typing import Dict, Optional, Any, List
 
 import internetarchive
 from fastapi import HTTPException
@@ -10,6 +11,8 @@ from pydantic import (
     PrivateAttr,
     model_validator,
 )
+
+#TODO: refactor this classes, multiple code smells
 
 class InternetArchiveSearchResults(dict):
     def __init__(self, params: dict):
@@ -94,6 +97,24 @@ class InternetArchiveSearchWrapper(BaseModel):
 
         return res
 
+
+    @staticmethod
+    def _internetarchive_download(
+            identifier: str,
+            files: List[str],
+            target_dir: str
+    ) -> dict:
+        item = internetarchive.get_item(identifier)
+        success = True
+        for file in files:
+            success &= internetarchive.File(item, file).download(
+                ignore_existing=True,
+                destdir=target_dir,
+            )
+
+
+        return {"success": success}
+
     def search(
             self,
             query: str,
@@ -113,7 +134,7 @@ class InternetArchiveSearchWrapper(BaseModel):
 
         res = self._internetarchive_query(params)
 
-        return res
+        return str(res)
 
     def item_metadata(
             self,
@@ -135,3 +156,19 @@ class InternetArchiveSearchWrapper(BaseModel):
         self._logger.info(f"Item Metadata Results: {res}")
 
         return res
+
+    def download(
+            self,
+            identifier: str,
+            files: List[str],
+            target_dir: Path
+    ):
+        prams = {
+            "identifier": identifier,
+            "files": files,
+            "target_dir": str(target_dir.resolve()),
+        }
+        result = self._internetarchive_download(**prams)
+
+
+

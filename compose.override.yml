@@ -5,8 +5,8 @@ services:
     depends_on:
       pgvector:
         condition: service_healthy
-      init-as:                                     # init dependency
-        condition: service_completed_successfully  # init dependency
+#      init-as:                                     # init dependency
+#        condition: service_completed_successfully  # init dependency
   searxng:
     ports:
       - "${SEARXNG_PORT_PUBLIC}:8080"
@@ -39,6 +39,8 @@ services:
   homepage:
     ports:
       - "${HOMEPAGE_PORT_PUBLIC}:8080"
-#  pgvector:
-#    volumes:
-#      - pgvector_data:/var/lib/postgresql/data
+  pgvector:
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    ports:
+      - "${PGVECTOR_PORT_PUBLIC}:5432"

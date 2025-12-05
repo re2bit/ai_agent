@@ -39,6 +39,8 @@ services:
   homepage:
     ports:
       - "${HOMEPAGE_PORT_PUBLIC}:8080"
-#  pgvector:
-#    volumes:
-#      - pgvector_data:/var/lib/postgresql/data
+  pgvector:
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    ports:
+      - "${PGVECTOR_PORT_PUBLIC}:5432"

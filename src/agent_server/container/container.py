@@ -9,7 +9,8 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_postgres import PGEngine
 from langfuse import Langfuse
 from langfuse.langchain import CallbackHandler
-
+from sqlmodel import create_engine
+from sqlalchemy import Engine
 from ..ai.prompts.sql_agent import SqlAgent
 from ..ai.agents.sql_agent import SQLAgent
 from ..ai.agents.internet_archive import AgentFactory
@@ -61,9 +62,13 @@ class Container(containers.DeclarativeContainer):
         PGEngine.from_connection_string,
         url=config.pgvector.url
     )
-    langchain_postgres = providers.Singleton(
+    langchain_postgres: SQLDatabase = providers.Singleton(
         SQLDatabase.from_uri,
         database_uri=config.pgvector.url,
+    )
+    sqlmodel_engine_postgres: Engine = providers.Singleton(
+        create_engine,
+        config.pgvector.url
     )
 
     ########################
@@ -103,9 +108,9 @@ class Container(containers.DeclarativeContainer):
         lambda factory: factory.create(),
         factory=providers.Singleton(
             AgentFactory,
+            engine=sqlmodel_engine_postgres,
             llm=llm,
             logger=logger,
-            db=langchain_postgres,
             langfuse_config=langfuse_config,
             k=40,
         )
@@ -117,10 +122,11 @@ class Container(containers.DeclarativeContainer):
             AgentFactory,
             llm=llm,
             logger=logger,
-            db=langchain_postgres,
+            engine=sqlmodel_engine_postgres,
             langfuse_config=langfuse_config,
             k=40,
-            data_root="/data/ia"
+            cache_dir="/data/ia/cache",
+            data_dir = "/data/ia/data",
         )
     )
 

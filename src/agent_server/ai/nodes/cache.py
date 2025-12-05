@@ -7,7 +7,7 @@ from typing import Any, Optional, Callable
 from langchain_core.runnables import RunnableSerializable
 from pydantic import PrivateAttr
 
-DATA_ROOT = "/data/ia"
+DATA_ROOT = "/data/ia/cache"
 
 
 def _hash_query(query: str) -> str:
@@ -130,21 +130,21 @@ class CacheFactory:
     def create_nodes(
         *,
         _logger: logging.Logger | None = None,
-        _data_root: str | None = None,
+        _directory: str | None = None,
         _cache_file_name: str = "query.json",
         _cached_results_key: str = "cached_results",
         _cache_key_getter: Callable[[dict], Optional[str]] = lambda s: s.get("cache_key") or s.get("query"),
     ) -> tuple[CacheReaderNode, CacheWriterNode]:
         reader = CacheReaderNode(
             _logger=_logger,
-            _data_root=_data_root,
+            _data_root=_directory,
             _cache_file_name=_cache_file_name,
             _cached_results_key=_cached_results_key,
             _cache_key_getter=_cache_key_getter,
         )
         writer = CacheWriterNode(
             _logger=_logger,
-            _data_root=_data_root,
+            _data_root=_directory,
             _cache_file_name=_cache_file_name,
             _cache_key_getter=_cache_key_getter,
         )

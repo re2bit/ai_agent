@@ -23,8 +23,26 @@ _PROMPT_FILTER: Final[PromptTemplate] = PromptTemplate.from_template(_TEMPLATE_F
 
 class FilterPromptFactory(BaseModel, IPromptTemplateFactoryInterface):
     @classmethod
-    def create(cls, results: str, query: str) -> str:
-        return _PROMPT_FILTER.format(results=results, query=query)
+    def create(
+            cls,
+            results: str,
+            query: str,
+            parser: Optional[JsonOutputParser] = None
+    ) -> str:
+        template = _TEMPLATE_FILTER
+
+        params = dict(
+            results=results,
+            query=query
+        )
+
+        if parser is not None:
+            template = template + "\n{format_instructions}"
+            params["format_instructions"] = parser.get_format_instructions()
+
+        prompt_template = PromptTemplate.from_template(template)
+
+        return prompt_template.format(**params)
 
 _TEMPLATE_FINDER: Final[str] = """
 You are a precise assistant that evaluates Internet Archive entries for relevance.
@@ -54,7 +72,7 @@ Important notes:
 
 """
 
-class FinderPromptFactory(BaseModel, IPromptTemplateFactoryInterface):
+class FinderPromptFactory(IPromptTemplateFactoryInterface, BaseModel):
     @classmethod
     def create(
             cls,
@@ -89,3 +107,51 @@ class AgentPromptFactory(BaseModel, IPromptTemplateFactoryInterface):
     @classmethod
     def create(cls) -> str:
         return _PROMPT_AGENT.format()
+
+
+# New prompt to select relevant PDF files from an item's file list
+_TEMPLATE_FILE_FINDER: Final[str] = """
+You are a careful assistant that selects the most relevant PDF files for the user's query from a single Internet Archive item.
+
+User query:
+{query}
+
+Item identifier/name:
+{name}
+
+All available files for this item (JSON array):
+{files}
+
+Instructions:
+- Return only files that are actual PDFs. Accept typical PDF formats such as "PDF", "Text PDF", "Image Container PDF", "Searchable PDF".
+- Prefer high-quality or searchable PDFs if available. If there is both an OCR/searchable PDF and a raw image PDF, include the searchable one first.
+- Prefer files with source "original" over "derivative" when both are equivalent.
+- Exclude non-PDF files (ePub, DjVu, HTML, JP2, TXT, XML, etc.).
+- If multiple PDFs are relevant, you may include more than one, but keep it minimal.
+- If none are relevant or no PDFs exist, return an empty list.
+
+Output format:
+- Return only JSON with a single field "pdfs_to_download" which is a list of file names (strings).
+- Example: {{"pdfs_to_download": ["Example Item.pdf"]}}
+"""
+
+class FileFinderPromptFactory(IPromptTemplateFactoryInterface, BaseModel):
+    @classmethod
+    def create(
+        cls,
+        query: str,
+        name: str,
+        files: list[dict],
+        parser: Optional[JsonOutputParser] = None,
+    ) -> str:
+        template: str = _TEMPLATE_FILE_FINDER
+        params = dict(
+            query=query,
+            name=name,
+            files=json.dumps(files),
+        )
+        if parser is not None:
+            template = template + "\n{format_instructions}"
+            params["format_instructions"] = parser.get_format_instructions()
+        prompt_template = PromptTemplate.from_template(template)
+        return prompt_template.format(**params)
